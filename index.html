@@ -2,512 +2,2307 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoTracker Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ExploreYourWay - Fog of War</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <style>
-        /* Themes Definitionen */
-        :root {
-            --bg-color: #EDE8D0; /* Minimalistischer Beige-Ton */
-            --card-bg: #ffffff;
-            --primary: #2E7D32;
-            --primary-light: #81C784;
-            --text-main: #2C3E50;
-            --text-muted: #7F8C8D;
-            --border: #D3CDBE;
-            --danger: #D32F2F;
-        }
-
-        [data-theme="sand"] {
-            --bg-color: #D3CDBE; /* Dunklerer Sand-Ton */
-            --border: #CDC3B7;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body {
+            height: 100%;
             margin: 0;
             padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            transition: background-color 0.3s ease;
+            overflow: hidden;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+        :root {
+            --bg-main: #f8fafc;
+            --bg-sidebar: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --bg-card: #f1f5f9;
+        }
+        .dark-theme {
+            --bg-main: #09090b;
+            --bg-sidebar: #121214;
+            --border-color: #27272a;
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --bg-card: #18181b;
+        }
+        body { background-color: var(--bg-main); color: var(--text-main); transition: background 0.3s, color 0.3s; }
+        aside { background-color: var(--bg-sidebar); border-color: var(--border-color); }
+        .card { background-color: var(--bg-card); border-color: var(--border-color); }
+        .leaflet-popup-content-wrapper { background: var(--bg-sidebar); color: var(--text-main); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
+
+        .tab-btn { transition: all 0.15s; }
+        .tab-btn.active { background: #0f172a; color: white; }
+        .dark-theme .tab-btn.active { background: white; color: #0f172a; }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(237, 232, 208, 0.75) !important;
+            backdrop-filter: blur(12px) saturate(180%);
+            -webkit-backdrop-filter: blur(12px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.5) !important;
+            color: #1a1a1a !important;
+            border-radius: 16px !important;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+            padding: 0 !important;
+        }
+        .leaflet-popup-tip {
+            background: rgba(237, 232, 208, 0.8) !important;
+        }
+        .leaflet-popup-content {
+            margin: 14px !important;
+            font-family: inherit !important;
+            line-height: 1.5 !important;
+        }
+        .leaflet-popup-close-button {
+            top: 6px !important;
+            right: 6px !important;
+            color: rgba(0,0,0,0.4) !important;
+            font-size: 18px !important;
+        }
+        .dark-theme .leaflet-popup-content-wrapper {
+            background: rgba(30, 30, 34, 0.8) !important;
+            color: #f4f4f5 !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        .dark-theme .leaflet-popup-close-button {
+            color: rgba(255,255,255,0.4) !important;
         }
 
-        /* Header Navigation */
-        header {
-            background: var(--card-bg);
-            border-bottom: 1px solid var(--border);
-            padding: 15px 20px;
+        .progress-bar-outer { background: var(--bg-card); border-radius: 9999px; height: 6px; overflow: hidden; }
+        .progress-bar-inner { height: 100%; border-radius: 9999px; transition: width 0.5s ease; }
+
+        .region-row { border-bottom: 1px solid var(--border-color); padding: 0.5rem 0; }
+
+        #import-progress-bar { transition: width 0.3s ease; }
+
+        /* === KRITISCHER FIX: Stabile Kartengröße === */
+        #app-root {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+        @media (min-width: 768px) {
+            #app-root { flex-direction: row; overflow: hidden; }
         }
 
-        h1 { margin: 0; font-size: 20px; font-weight: 700; }
-
-        .nav-controls { display: flex; gap: 10px; align-items: center; }
-
-        .nav-tabs { display: flex; gap: 5px; }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: 6px;
-            color: var(--text-muted);
+        #sidebar {
+            width: 100%;
+            max-width: 100%;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-height: 45vh;
+        }
+        @media (min-width: 768px) {
+            #sidebar {
+                width: 320px;
+                min-width: 320px;
+                max-width: 320px;
+                border-bottom: none;
+                border-right: 1px solid var(--border-color);
+                height: 100vh;
+                max-height: none;
+            }
         }
 
-        .tab-btn.active { background: var(--primary); color: white; }
-
-        .settings-trigger {
-            background: none;
-            border: 1px solid var(--border);
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        /* Main Container */
-        .main-container { max-width: 1200px; margin: 25px auto; padding: 0 20px; }
-        .view-section { display: none; }
-        .view-section.active { display: block; }
-
-        /* Dashboard-Grid */
-        .time-filters {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-
-        .filter-card {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            text-align: center;
-            cursor: pointer;
-        }
-
-        .filter-card.selected { border-color: var(--primary); background: #F1F8E9; }
-        .filter-card h4 { margin: 0 0 5px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; }
-        .filter-card .count { font-size: 28px; font-weight: 700; color: var(--primary); }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .location-list { max-height: 450px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-        .location-item { padding: 12px 0; border-bottom: 1px solid #F0EFEA; font-size: 14px; }
-        .location-item .time { font-weight: 600; margin-right: 10px; }
-        .location-item .addr { color: var(--text-muted); }
-
-        /* Explore Map */
-        #map { height: 600px; width: 100%; border-radius: 10px; }
-
-        /* SETTINGS OVERLAY (POP-UP) */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-
-        .modal-box {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            padding: 25px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 450px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        #map-container {
+            flex: 1;
             position: relative;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
+        }
+        @media (max-width: 767px) {
+            #map-container { min-height: 55vh; }
         }
 
-        .modal-close {
+        #map {
             position: absolute;
-            top: 15px; right: 15px;
-            background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);
+            inset: 0;
+            width: 100% !important;
+            height: 100% !important;
+            background: #e8e4dc;
         }
 
-        .setting-row { margin-bottom: 20px; }
-        .setting-row label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
-
-        .theme-btn-group { display: flex; gap: 10px; }
-        .theme-btn {
-            flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
-            background: var(--card-bg); cursor: pointer; font-weight: 600;
+        /* Fog Layer mit CSS-Blur */
+        #fog-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 400;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
-        .theme-btn.active { border-color: var(--primary); background: #F1F8E9; color: var(--primary); }
+        #fog-layer.visible { opacity: 1; }
 
-        .btn-danger {
-            background: var(--danger); color: white; border: none; padding: 10px;
-            border-radius: 6px; cursor: pointer; width: 100%; font-weight: 600;
+        #fog-backdrop {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 20, 0.75);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
         }
 
-        /* Status Log im Pop-up */
-        #statusLog {
-            background: #F8F9FA; padding: 10px; border-radius: 6px; font-size: 12px;
-            margin-top: 15px; max-height: 120px; overflow-y: auto; display: none;
-            border: 1px solid #E2E8F0;
+        /* Explored area canvas */
+        #explored-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 401;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
         }
+
+        /* Data inspector table */
+        .inspector-row {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .inspector-row:hover { background: var(--bg-card); }
+        .dark-theme .inspector-row:hover { background: #1f1f23; }
+
+        /* District highlight */
+        .district-highlight {
+            animation: pulse-glow 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes pulse-glow {
+            from { filter: brightness(1) drop-shadow(0 0 4px rgba(99,102,241,0.3)); }
+            to { filter: brightness(1.2) drop-shadow(0 0 12px rgba(99,102,241,0.6)); }
+        }
+
+        /* Floating toast */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            z-index: 10000;
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .glow-point {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(99,102,241,0.4);
+            box-shadow: 0 0 20px 10px rgba(99,102,241,0.25);
+            pointer-events: none;
+            z-index: 398;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.3s;
+        }
+
+        .leaflet-interactive { cursor: pointer; }
+
+        /* ===== RIGHT DETAIL PANEL ===== */
+        #detail-panel {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 280px;
+            max-height: calc(100% - 24px);
+            overflow-y: auto;
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transform: translateX(320px);
+            opacity: 0;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            pointer-events: none;
+            padding: 14px;
+        }
+        #detail-panel.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: all;
+        }
+        #detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        #detail-title { font-size: 13px; font-weight: 700; color: var(--text-main); }
+        #detail-close {
+            background: none; border: none; cursor: pointer; font-size: 18px;
+            color: var(--text-muted); padding: 0; line-height: 1; opacity: 0.6;
+        }
+        #detail-close:hover { opacity: 1; }
+
+        #detail-last {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            margin-bottom: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 11px;
+        }
+        #detail-last-icon { font-size: 20px; }
+        #detail-last-meta { display: flex; flex-direction: column; }
+        #detail-last-date { font-weight: 600; }
+        #detail-last-weather { color: var(--text-muted); font-size: 10px; }
+
+        #detail-list-label {
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 6px;
+        }
+        .dp-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 0; border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+        }
+        .dp-row:last-child { border-bottom: none; }
+        .dp-row-icon { font-size: 12px; width: 16px; text-align: center; }
+        .dp-row-meta { color: var(--text-muted); font-size: 10px; margin-left: auto; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>📍 GeoTracker</h1>
-        <div class="nav-controls">
-            <div class="nav-tabs">
-                <button class="tab-btn active" onclick="switchView('dashboard')">Übersicht</button>
-                <button class="tab-btn" onclick="switchView('explore')">Entdecken (Karte)</button>
-            </div>
-            <button class="settings-trigger" onclick="toggleSettings(true)">⚙️</button>
-        </div>
-    </header>
-
-    <div class="main-container">
-        <div id="view-dashboard" class="view-section active">
-            <div class="time-filters">
-                <div class="filter-card selected" id="filter-all" onclick="setTimeFilter('all')">
-                    <h4>Immer</h4><div class="count" id="count-all">0</div>
-                </div>
-                <div class="filter-card" id="filter-today" onclick="setTimeFilter('today')">
-                    <h4>Heute</h4><div class="count" id="count-today">0</div>
-                </div>
-                <div class="filter-card" id="filter-week" onclick="setTimeFilter('week')">
-                    <h4>Diese Woche</h4><div class="count" id="count-week">0</div>
-                </div>
-                <div class="filter-card" id="filter-year" onclick="setTimeFilter('year')">
-                    <h4>Dieses Jahr</h4><div class="count" id="count-year">0</div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3 id="list-title">Einträge (Immer)</h3>
-                <ul class="location-list" id="logList">
-                    <li class="location-item" style="color: var(--text-muted)">Keine Daten geladen. Öffne die Einstellungen, um ein CSV-Log zu importieren.</li>
-                </ul>
-            </div>
+<div id="app-root">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="shadow-sm">
+        <!-- Tab bar -->
+        <div class="flex border-b p-2 gap-1" style="border-color:var(--border-color);">
+            <button onclick="switchTab('karte')" id="tab-karte" class="tab-btn active flex-1 text-xs font-semibold py-1.5 rounded-md">🗺 Karte</button>
+            <button onclick="switchTab('entdeckt')" id="tab-entdeckt" class="tab-btn flex-1 text-xs font-semibold py-1.5 rounded-md">🏆 Entdeckt</button>
+            <button onclick="switchTab('einstellungen')" id="tab-einstellungen" class="tab-btn flex-1 text-xs font-semibold py-1.5 rounded-md">⚙ Einstellungen</button>
         </div>
 
-        <div id="view-explore" class="view-section">
-            <div class="card" style="padding: 10px;">
-                <div id="map"></div>
+        <!-- TAB: KARTE -->
+        <div id="panel-karte" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-base font-bold tracking-tight">ExploreYourWay</h1>
+                    <p class="text-[10px]" style="color:var(--text-muted)">Fog of War · Advanced Analytics</p>
+                </div>
+                <button onclick="toggleTheme()" class="p-2 rounded-lg border text-xs font-semibold cursor-pointer" style="border-color:var(--border-color);">☯ Theme</button>
+            </div>
+
+            <!-- Import -->
+            <div class="p-3 rounded-xl border border-dashed text-center" style="border-color:var(--border-color);background:var(--bg-card);">
+                <label class="block text-xs font-medium mb-1">Standort-Log importieren</label>
+                <div class="flex gap-1 mb-2">
+                    <input type="file" id="csvFileInput" accept=".csv,.txt" onchange="handleFileUpload(event)" class="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 cursor-pointer"/>
+                </div>
+                <p class="text-[9px]" style="color:var(--text-muted)">Unterstützt: .csv (Komma-getrennt) · .txt (|...|-Format)</p>
+                <div id="importStatusContainer" class="mt-2 hidden">
+                    <div class="flex justify-between text-[10px] mb-1" style="color:var(--text-muted)">
+                        <span id="importStatusText">Verarbeite...</span>
+                        <span id="importPercent">0%</span>
+                    </div>
+                    <div class="progress-bar-outer">
+                        <div id="import-progress-bar" class="progress-bar-inner" style="width:0%;background:linear-gradient(to right,#6366f1,#10b981);"></div>
+                    </div>
+                    <p id="liveAddressTracker" class="text-[10px] mt-1 truncate" style="color:var(--text-muted)">—</p>
+                    <div id="importStats" class="mt-2 grid grid-cols-3 gap-1 hidden">
+                        <div class="text-center p-1 rounded" style="background:var(--bg-main)"><div id="imp-total" class="font-bold text-xs">0</div><div class="text-[9px]" style="color:var(--text-muted)">Zeilen</div></div>
+                        <div class="text-center p-1 rounded" style="background:var(--bg-main)"><div id="imp-ok" class="font-bold text-xs text-green-500">0</div><div class="text-[9px]" style="color:var(--text-muted)">Geocodiert</div></div>
+                        <div class="text-center p-1 rounded" style="background:var(--bg-main)"><div id="imp-fail" class="font-bold text-xs text-red-400">0</div><div class="text-[9px]" style="color:var(--text-muted)">Fehler</div></div>
+                    </div>
+                    <div id="importErrorLog" class="mt-1 hidden max-h-16 overflow-y-auto text-[9px]" style="color:var(--text-muted)"></div>
+                </div>
+            </div>
+
+            <!-- Zeitfenster -->
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Zeitfenster</label>
+                <nav class="grid grid-cols-4 gap-1">
+                    <button onclick="changeTimeframe('heute')" id="btn-heute" class="filter-btn text-center px-1 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100" style="background:var(--bg-card)">Heute</button>
+                    <button onclick="changeTimeframe('woche')" id="btn-woche" class="filter-btn text-center px-1 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100" style="background:var(--bg-card)">Woche</button>
+                    <button onclick="changeTimeframe('monat')" id="btn-monat" class="filter-btn text-center px-1 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100" style="background:var(--bg-card)">Monat</button>
+                    <button onclick="changeTimeframe('jahr')" id="btn-jahr" class="filter-btn text-center px-1 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100" style="background:var(--bg-card)">Jahr</button>
+                    <button onclick="changeTimeframe('immer')" id="btn-immer" class="filter-btn text-center px-1 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100 col-span-2" style="background:var(--bg-card)">Immer</button>
+                    <button onclick="changeTimeframe('datum')" id="btn-datum" class="filter-btn text-center px-1 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100 col-span-2" style="background:var(--bg-card)">📅 Datum</button>
+                </nav>
+                <div id="date-picker-container" class="hidden mt-1">
+                    <input type="date" id="datePicker" onchange="onDatePicked()" class="w-full rounded-lg p-1.5 text-xs border" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">
+                </div>
+            </div>
+
+            <!-- Layer-Toggles -->
+            <div class="card p-3 rounded-xl border space-y-1.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold">📍 Your Way</span>
+                    <input type="checkbox" id="yourWayToggle" onchange="toggleLayer()" class="w-4 h-4 accent-indigo-600">
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-xs font-semibold">🗺 Explore Mode</span>
+                    <input type="checkbox" id="exploreModeToggle" onchange="toggleLayer()" checked class="w-4 h-4 accent-indigo-600">
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-xs font-semibold">🌫 Blur</span>
+                    <input type="checkbox" id="fogToggle" onchange="toggleLayer()" checked class="w-4 h-4 accent-indigo-600">
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-xs font-semibold">🌍 Länder</span>
+                    <input type="checkbox" id="countryModeToggle" onchange="toggleLayer()" class="w-4 h-4 accent-indigo-600">
+                </div>
+            </div>
+
+            <!-- Statistik -->
+            <div class="grid grid-cols-3 gap-2 border-t pt-3" style="border-color:var(--border-color)">
+                <div class="card rounded-xl border p-3">
+                    <span class="text-[9px] uppercase tracking-wider" style="color:var(--text-muted)">Datenpunkte</span>
+                    <div id="stats-count" class="text-xl font-bold">0</div>
+                </div>
+                <div class="card rounded-xl border p-3">
+                    <span class="text-[9px] uppercase tracking-wider" style="color:var(--text-muted)">Unique Orte</span>
+                    <div id="stats-unique" class="text-xl font-bold text-indigo-500">0</div>
+                </div>
+                <div class="card rounded-xl border p-3">
+                    <span class="text-[9px] uppercase tracking-wider" style="color:var(--text-muted)">Freigeschaltet</span>
+                    <div id="stats-unlocked" class="text-xl font-bold text-green-500">0</div>
+                </div>
+            </div>
+            <div id="dataStatus" class="text-[9px] text-center tracking-wide hidden" style="color:var(--text-muted)"></div>
+        </div>
+
+        <!-- TAB: ENTDECKT -->
+        <div id="panel-entdeckt" class="flex-1 overflow-y-auto p-4 space-y-4 hidden">
+            <!-- Fläche Stats -->
+            <div class="card rounded-xl border p-4 space-y-3">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Entdeckte Fläche</label>
+                <div class="text-3xl font-black text-green-500" id="explore-area">0 km²</div>
+                <div class="text-xs" style="color:var(--text-muted)">1 unique Ort = 1 km² · Gleicher Ort mehrfach = zählt einmal</div>
+                <div class="border-t pt-3" style="border-color:var(--border-color)">
+                    <div class="grid grid-cols-2 gap-2 text-center">
+                        <div><div id="explore-unique" class="font-bold text-lg">0</div><div class="text-[10px]" style="color:var(--text-muted)">Unique Orte</div></div>
+                        <div><div id="explore-days" class="font-bold text-lg">0</div><div class="text-[10px]" style="color:var(--text-muted)">Aktive Tage</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Achievement Liste -->
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Achievements <span id="achv-count" class="font-normal opacity-60"></span></label>
+                <div id="achievement-list" class="space-y-1.5"></div>
+            </div>
+        </div>
+
+        <!-- TAB: EINSTELLUNGEN -->
+        <div id="panel-einstellungen" class="flex-1 overflow-y-auto p-4 space-y-5 hidden">
+            <h2 class="text-sm font-bold">Einstellungen</h2>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Karten-Stil</label>
+                <select id="mapModeSelect" onchange="changeMapLayer()" class="w-full rounded-lg p-2 text-xs font-medium border" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">
+                    <option value="light">Standard (Hell)</option>
+                    <option value="dark">Minimalistisch (Dunkel)</option>
+                    <option value="satellite">Satellit</option>
+                    <option value="topo">Topografisch</option>
+                    <option value="osm">OpenStreetMap Classic</option>
+                </select>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Wetter-Filter</label>
+                <select id="weatherFilter" onchange="toggleLayer()" class="w-full rounded-lg p-2 text-xs border" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">
+                    <option value="alle">Alle Wetterbedingungen</option>
+                    <option value="Regen">Nur Regen & Sturm</option>
+                    <option value="Sonne">Nur Sonnenschein</option>
+                </select>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Nebel-Stärke</label>
+                <div class="flex items-center gap-3">
+                    <input type="range" id="fogOpacity" min="40" max="95" value="75" oninput="updateFogOpacity(this.value)" class="flex-1 accent-indigo-600">
+                    <span id="fogOpacityLabel" class="text-xs font-bold w-8 text-center">75%</span>
+                </div>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Entdeckungs-Radius</label>
+                <div class="flex items-center gap-3">
+                    <input type="range" id="exploreRadius" min="200" max="2000" value="1000" step="100" oninput="updateExploreRadius(this.value)" class="flex-1 accent-indigo-600">
+                    <span id="exploreRadiusLabel" class="text-xs font-bold w-12 text-center">1000m</span>
+                </div>
+            </div>
+
+            <!-- Daten-Inspektor -->
+            <div class="space-y-1.5 pt-2 border-t" style="border-color:var(--border-color)">
+                <div class="flex items-center justify-between">
+                    <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Daten-Inspektor</label>
+                    <span id="inspector-count" class="text-[10px]" style="color:var(--text-muted)">0 Einträge</span>
+                </div>
+                <p class="text-[9px]" style="color:var(--text-muted)">Klicke auf eine Zeile, um auf der Karte zu diesem Punkt zu springen.</p>
+                <div id="inspector-table-container" class="max-h-48 overflow-y-auto rounded-lg border" style="border-color:var(--border-color);background:var(--bg-card);">
+                    <table class="w-full text-[10px]">
+                        <thead><tr style="color:var(--text-muted)"><th class="p-1 text-left">#</th><th class="p-1 text-left">Datum</th><th class="p-1 text-left">Ort</th><th class="p-1 text-left">Status</th></tr></thead>
+                        <tbody id="inspector-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Länder-Manager (durchsuchbar) -->
+            <div class="space-y-1.5 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">🌍 Welt-Länder (durchsuchbar)</label>
+                <input id="country-search" oninput="filterCountryList(this.value)" placeholder="Land suchen..." class="w-full rounded-lg p-2 text-xs border mb-1" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">
+                <div class="flex items-center gap-1 mb-1">
+                    <span id="country-count" class="text-[10px]" style="color:var(--text-muted)">0/195 besucht</span>
+                </div>
+                <div id="country-list" class="max-h-40 overflow-y-auto rounded-lg border" style="border-color:var(--border-color);background:var(--bg-card);"></div>
+            </div>
+
+            <!-- Export -->
+            <div class="space-y-1.5 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Export / Backup</label>
+                <button onclick="exportData('json')" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">⬇ Logs als JSON</button>
+                <button onclick="exportData('csv')" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">⬇ Logs als CSV</button>
+                <button onclick="exportData('geojson')" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">⬇ Logs als GeoJSON</button>
+                <button onclick="exportFullBackup()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">💾 Komplett-Backup (alle Daten + Einstellungen)</button>
+                <input type="file" id="backupFileInput" accept=".json" hidden onchange="importFullBackup(event)">
+                <button onclick="document.getElementById('backupFileInput').click()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">📂 Backup importieren</button>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="space-y-1.5 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60 text-red-500">Danger Zone</label>
+                <button onclick="clearAllData()" class="w-full text-xs font-semibold py-2 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20">🗑 Alle Daten löschen</button>
+                <button onclick="forceResave()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">💾 Jetzt speichern (Debug)</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAP CONTAINER + RIGHT PANEL -->
+    <div id="map-container">
+        <div id="map"></div>
+        <canvas id="explored-canvas"></canvas>
+        <div id="fog-layer"><div id="fog-backdrop"></div></div>
+        <div id="glow-points"></div>
+
+        <!-- RIGHT DETAIL PANEL (slide-in beim Marker-Klick) -->
+        <div id="detail-panel">
+            <div id="detail-header">
+                <div id="detail-title">Ort laden...</div>
+                <button id="detail-close" onclick="closeDetailPanel()">×</button>
+            </div>
+            <div id="detail-last">
+                <!-- Befüllt durch JS -->
+            </div>
+            <div id="detail-list-label">Verlauf</div>
+            <div id="detail-list">
+                <!-- Befüllt durch JS -->
             </div>
         </div>
     </div>
+</div>
 
-    <div class="modal-overlay" id="settingsModal">
-        <div class="modal-box">
-            <button class="modal-close" id="closeModalBtn" onclick="toggleSettings(false)">×</button>
-            <h3 style="margin-top: 0; margin-bottom: 20px;">Einstellungen</h3>
+<!-- Toast -->
+<div id="toast"></div>
 
-            <div class="setting-row">
-                <label>Design-Theme</label>
-                <div class="theme-btn-group">
-                    <button class="theme-btn active" id="theme-beige-btn" onclick="setTheme('beige')">Zen Beige</button>
-                    <button class="theme-btn" id="theme-sand-btn" onclick="setTheme('sand')">Desert Sand</button>
-                </div>
-            </div>
-
-            <div class="setting-row" id="uploadRow">
-                <label>Standort-Log importieren (.csv)</label>
-                <input type="file" id="fileInput" accept=".csv" style="width: 100%;" />
-                <div id="statusLog"></div>
-            </div>
-
-            <div class="setting-row" style="margin-bottom: 0; margin-top: 25px;">
-                <label>Datenpflege</label>
-                <button class="btn-danger" id="clearStorageBtn">Alle gespeicherten Orte löschen</button>
-            </div>
-        </div>
-    </div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map = null;
-    let trackerLayer = null;
-    let allPoints = [];
-    let currentTimeFilter = 'all';
-    let isUploading = false; // Verhindert das Schließen des Pop-ups während des Uploads
+// =====================================================================
+// KONFIGURATION
+// =====================================================================
+const TILE_LAYERS = {
+    light: ['https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', '&copy; OpenStreetMap &copy; CARTO'],
+    dark:  ['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', '&copy; OpenStreetMap &copy; CARTO'],
+    satellite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', '&copy; Esri'],
+    topo:  ['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', '&copy; OpenTopoMap'],
+    osm:   ['https://tile.openstreetmap.de/{z}/{x}/{y}.png', '&copy; OpenStreetMap contributors'],
+};
 
-    document.addEventListener("DOMContentLoaded", () => {
-        // Theme wiederherstellen falls vorhanden
-        const savedTheme = localStorage.getItem("app_theme") || "beige";
-        setTheme(savedTheme);
-        
-        loadDataFromStorage();
+// Deutschland-Stadtteile (vereinfachte Polygone für Großstädte)
+// Format: [name, [[lat,lon],...]]  — approximierte Grenzen
+const GERMAN_DISTRICTS = [
+    // === BERLIN (12 Bezirke) ===
+    { city: 'Berlin', name: 'Mitte', polygon: [[52.540,13.350],[52.540,13.420],[52.500,13.420],[52.500,13.350]] },
+    { city: 'Berlin', name: 'Friedrichshain-Kreuzberg', polygon: [[52.500,13.380],[52.500,13.470],[52.480,13.470],[52.480,13.380]] },
+    { city: 'Berlin', name: 'Pankow', polygon: [[52.560,13.350],[52.560,13.480],[52.500,13.480],[52.500,13.350]] },
+    { city: 'Berlin', name: 'Charlottenburg-Wilmersdorf', polygon: [[52.510,13.280],[52.510,13.350],[52.480,13.350],[52.480,13.280]] },
+    { city: 'Berlin', name: 'Spandau', polygon: [[52.550,13.150],[52.550,13.250],[52.500,13.250],[52.500,13.150]] },
+    { city: 'Berlin', name: 'Steglitz-Zehlendorf', polygon: [[52.450,13.250],[52.450,13.380],[52.420,13.380],[52.420,13.250]] },
+    { city: 'Berlin', name: 'Tempelhof-Schöneberg', polygon: [[52.480,13.320],[52.480,13.420],[52.440,13.420],[52.440,13.320]] },
+    { city: 'Berlin', name: 'Neukölln', polygon: [[52.480,13.410],[52.480,13.470],[52.430,13.470],[52.430,13.410]] },
+    { city: 'Berlin', name: 'Treptow-Köpenick', polygon: [[52.460,13.420],[52.460,13.600],[52.400,13.600],[52.400,13.420]] },
+    { city: 'Berlin', name: 'Marzahn-Hellersdorf', polygon: [[52.540,13.520],[52.540,13.620],[52.500,13.620],[52.500,13.520]] },
+    { city: 'Berlin', name: 'Lichtenberg', polygon: [[52.530,13.470],[52.530,13.550],[52.500,13.550],[52.500,13.470]] },
+    { city: 'Berlin', name: 'Reinickendorf', polygon: [[52.570,13.280],[52.570,13.400],[52.530,13.400],[52.530,13.280]] },
+
+    // === HAMBURG (7 Bezirke) ===
+    { city: 'Hamburg', name: 'Hamburg-Mitte', polygon: [[53.560,9.950],[53.560,10.100],[53.500,10.100],[53.500,9.950]] },
+    { city: 'Hamburg', name: 'Altona', polygon: [[53.560,9.880],[53.560,9.970],[53.530,9.970],[53.530,9.880]] },
+    { city: 'Hamburg', name: 'Eimsbüttel', polygon: [[53.580,9.920],[53.580,10.000],[53.550,10.000],[53.550,9.920]] },
+    { city: 'Hamburg', name: 'Hamburg-Nord', polygon: [[53.600,9.950],[53.600,10.050],[53.570,10.050],[53.570,9.950]] },
+    { city: 'Hamburg', name: 'Wandsbek', polygon: [[53.600,10.050],[53.600,10.180],[53.540,10.180],[53.540,10.050]] },
+    { city: 'Hamburg', name: 'Bergedorf', polygon: [[53.490,10.150],[53.490,10.280],[53.440,10.280],[53.440,10.150]] },
+    { city: 'Hamburg', name: 'Harburg', polygon: [[53.460,9.920],[53.460,10.050],[53.420,10.050],[53.420,9.920]] },
+
+    // === MÜNCHEN (25 Stadtbezirke — vereinfacht) ===
+    { city: 'München', name: 'Altstadt-Lehel', polygon: [[48.140,11.555],[48.140,11.600],[48.125,11.600],[48.125,11.555]] },
+    { city: 'München', name: 'Ludwigsvorstadt-Isarvorstadt', polygon: [[48.140,11.540],[48.140,11.590],[48.120,11.590],[48.120,11.540]] },
+    { city: 'München', name: 'Maxvorstadt', polygon: [[48.160,11.560],[48.160,11.590],[48.140,11.590],[48.140,11.560]] },
+    { city: 'München', name: 'Schwabing-West', polygon: [[48.170,11.560],[48.170,11.600],[48.150,11.600],[48.150,11.560]] },
+    { city: 'München', name: 'Au-Haidhausen', polygon: [[48.130,11.580],[48.130,11.630],[48.115,11.630],[48.115,11.580]] },
+    { city: 'München', name: 'Sendling', polygon: [[48.120,11.520],[48.120,11.560],[48.100,11.560],[48.100,11.520]] },
+    { city: 'München', name: 'Sendling-Westpark', polygon: [[48.115,11.500],[48.115,11.540],[48.095,11.540],[48.095,11.500]] },
+    { city: 'München', name: 'Schwanthalerhöhe', polygon: [[48.130,11.520],[48.130,11.550],[48.120,11.550],[48.120,11.520]] },
+    { city: 'München', name: 'Neuhausen-Nymphenburg', polygon: [[48.160,11.510],[48.160,11.560],[48.140,11.560],[48.140,11.510]] },
+    { city: 'München', name: 'Moosach', polygon: [[48.185,11.490],[48.185,11.530],[48.170,11.530],[48.170,11.490]] },
+    { city: 'München', name: 'Milbertshofen-Am Hart', polygon: [[48.200,11.540],[48.200,11.590],[48.180,11.590],[48.180,11.540]] },
+    { city: 'München', name: 'Bogenhausen', polygon: [[48.160,11.590],[48.160,11.660],[48.140,11.660],[48.140,11.590]] },
+    { city: 'München', name: 'Berg am Laim', polygon: [[48.140,11.620],[48.140,11.660],[48.125,11.660],[48.125,11.620]] },
+    { city: 'München', name: 'Trudering-Riem', polygon: [[48.140,11.660],[48.140,11.760],[48.110,11.760],[48.110,11.660]] },
+    { city: 'München', name: 'Ramersdorf-Perlach', polygon: [[48.110,11.600],[48.110,11.690],[48.080,11.690],[48.080,11.600]] },
+    { city: 'München', name: 'Obergiesing', polygon: [[48.115,11.570],[48.115,11.610],[48.100,11.610],[48.100,11.570]] },
+    { city: 'München', name: 'Untergiesing-Harlaching', polygon: [[48.110,11.550],[48.110,11.600],[48.085,11.600],[48.085,11.550]] },
+    { city: 'München', name: 'Thalkirchen-Obersendling', polygon: [[48.100,11.520],[48.100,11.560],[48.080,11.560],[48.080,11.520]] },
+    { city: 'München', name: 'Hadern', polygon: [[48.115,11.470],[48.115,11.500],[48.100,11.500],[48.100,11.470]] },
+    { city: 'München', name: 'Pasing-Obermenzing', polygon: [[48.165,11.430],[48.165,11.490],[48.140,11.490],[48.140,11.430]] },
+    { city: 'München', name: 'Aubing-Lochhausen-Langwied', polygon: [[48.170,11.350],[48.170,11.430],[48.140,11.430],[48.140,11.350]] },
+    { city: 'München', name: 'Allach-Untermenzing', polygon: [[48.200,11.420],[48.200,11.490],[48.180,11.490],[48.180,11.420]] },
+    { city: 'München', name: 'Feldmoching-Hasenbergl', polygon: [[48.220,11.510],[48.220,11.570],[48.195,11.570],[48.195,11.510]] },
+    { city: 'München', name: 'Laim', polygon: [[48.150,11.490],[48.150,11.520],[48.135,11.520],[48.135,11.490]] },
+    { city: 'München', name: 'Fürstenried-West', polygon: [[48.090,11.470],[48.090,11.500],[48.075,11.500],[48.075,11.470]] },
+
+    // === KÖLN (9 Stadtbezirke) ===
+    { city: 'Köln', name: 'Innenstadt', polygon: [[50.940,6.930],[50.940,6.980],[50.920,6.980],[50.920,6.930]] },
+    { city: 'Köln', name: 'Rodentkirchen', polygon: [[50.880,6.960],[50.880,7.020],[50.860,7.020],[50.860,6.960]] },
+    { city: 'Köln', name: 'Lindenthal', polygon: [[50.930,6.870],[50.930,6.930],[50.900,6.930],[50.900,6.870]] },
+    { city: 'Köln', name: 'Ehrenfeld', polygon: [[50.950,6.890],[50.950,6.940],[50.930,6.940],[50.930,6.890]] },
+    { city: 'Köln', name: 'Nippes', polygon: [[50.970,6.920],[50.970,6.970],[50.950,6.970],[50.950,6.920]] },
+    { city: 'Köln', name: 'Chorweiler', polygon: [[51.010,6.870],[51.010,6.940],[50.980,6.940],[50.980,6.870]] },
+    { city: 'Köln', name: 'Porz', polygon: [[50.890,7.020],[50.890,7.120],[50.860,7.120],[50.860,7.020]] },
+    { city: 'Köln', name: 'Kalk', polygon: [[50.940,6.990],[50.940,7.060],[50.910,7.060],[50.910,6.990]] },
+    { city: 'Köln', name: 'Mülheim', polygon: [[50.970,6.990],[50.970,7.080],[50.950,7.080],[50.950,6.990]] },
+
+    // === FRANKFURT (16 Ortsbezirke) ===
+    { city: 'Frankfurt am Main', name: 'Innenstadt I', polygon: [[50.120,8.660],[50.120,8.700],[50.100,8.700],[50.100,8.660]] },
+    { city: 'Frankfurt am Main', name: 'Innenstadt II', polygon: [[50.120,8.700],[50.120,8.740],[50.105,8.740],[50.105,8.700]] },
+    { city: 'Frankfurt am Main', name: 'Innenstadt III', polygon: [[50.110,8.660],[50.110,8.700],[50.095,8.700],[50.095,8.660]] },
+    { city: 'Frankfurt am Main', name: 'Innenstadt IV', polygon: [[50.105,8.700],[50.105,8.740],[50.090,8.740],[50.090,8.700]] },
+    { city: 'Frankfurt am Main', name: 'Süd', polygon: [[50.090,8.660],[50.090,8.740],[50.070,8.740],[50.070,8.660]] },
+    { city: 'Frankfurt am Main', name: 'West', polygon: [[50.120,8.610],[50.120,8.670],[50.090,8.670],[50.090,8.610]] },
+    { city: 'Frankfurt am Main', name: 'Mitte-West', polygon: [[50.135,8.600],[50.135,8.650],[50.120,8.650],[50.120,8.600]] },
+    { city: 'Frankfurt am Main', name: 'Nord-West', polygon: [[50.155,8.580],[50.155,8.640],[50.135,8.640],[50.135,8.580]] },
+    { city: 'Frankfurt am Main', name: 'Nord-Ost', polygon: [[50.155,8.640],[50.155,8.710],[50.135,8.710],[50.135,8.640]] },
+    { city: 'Frankfurt am Main', name: 'Ost', polygon: [[50.120,8.730],[50.120,8.790],[50.090,8.790],[50.090,8.730]] },
+    { city: 'Frankfurt am Main', name: 'Kalbach-Riedberg', polygon: [[50.185,8.620],[50.185,8.670],[50.170,8.670],[50.170,8.620]] },
+    { city: 'Frankfurt am Main', name: 'Nieder-Erlenbach', polygon: [[50.210,8.690],[50.210,8.740],[50.195,8.740],[50.195,8.690]] },
+    { city: 'Frankfurt am Main', name: 'Harheim', polygon: [[50.195,8.670],[50.195,8.710],[50.185,8.710],[50.185,8.670]] },
+    { city: 'Frankfurt am Main', name: 'Nieder-Eschbach', polygon: [[50.210,8.650],[50.210,8.690],[50.195,8.690],[50.195,8.650]] },
+    { city: 'Frankfurt am Main', name: 'Bergen-Enkheim', polygon: [[50.165,8.720],[50.165,8.780],[50.145,8.780],[50.145,8.720]] },
+    { city: 'Frankfurt am Main', name: 'Frankfurter Berg', polygon: [[50.170,8.670],[50.170,8.710],[50.155,8.710],[50.155,8.670]] },
+
+    // === STUTTGART (23 Stadtbezirke) ===
+    { city: 'Stuttgart', name: 'Stuttgart-Mitte', polygon: [[48.780,9.160],[48.780,9.190],[48.765,9.190],[48.765,9.160]] },
+    { city: 'Stuttgart', name: 'Stuttgart-Nord', polygon: [[48.800,9.150],[48.800,9.190],[48.780,9.190],[48.780,9.150]] },
+    { city: 'Stuttgart', name: 'Stuttgart-Ost', polygon: [[48.785,9.190],[48.785,9.230],[48.770,9.230],[48.770,9.190]] },
+    { city: 'Stuttgart', name: 'Stuttgart-Süd', polygon: [[48.770,9.150],[48.770,9.200],[48.755,9.200],[48.755,9.150]] },
+    { city: 'Stuttgart', name: 'Stuttgart-West', polygon: [[48.785,9.120],[48.785,9.160],[48.765,9.160],[48.765,9.120]] },
+    { city: 'Stuttgart', name: 'Bad Cannstatt', polygon: [[48.810,9.200],[48.810,9.270],[48.790,9.270],[48.790,9.200]] },
+    { city: 'Stuttgart', name: 'Feuerbach', polygon: [[48.820,9.140],[48.820,9.180],[48.805,9.180],[48.805,9.140]] },
+    { city: 'Stuttgart', name: 'Zuffenhausen', polygon: [[48.840,9.140],[48.840,9.200],[48.820,9.200],[48.820,9.140]] },
+    { city: 'Stuttgart', name: 'Möhringen', polygon: [[48.730,9.130],[48.730,9.190],[48.710,9.190],[48.710,9.130]] },
+    { city: 'Stuttgart', name: 'Vaihingen', polygon: [[48.740,9.080],[48.740,9.140],[48.720,9.140],[48.720,9.080]] },
+
+    // === DÜSSELDORF (10 Stadtbezirke) ===
+    { city: 'Düsseldorf', name: 'Stadtbezirk 1', polygon: [[51.230,6.760],[51.230,6.800],[51.210,6.800],[51.210,6.760]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 2', polygon: [[51.215,6.790],[51.215,6.830],[51.195,6.830],[51.195,6.790]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 3', polygon: [[51.200,6.750],[51.200,6.790],[51.175,6.790],[51.175,6.750]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 4', polygon: [[51.250,6.740],[51.250,6.780],[51.230,6.780],[51.230,6.740]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 5', polygon: [[51.275,6.760],[51.275,6.800],[51.250,6.800],[51.250,6.760]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 6', polygon: [[51.280,6.800],[51.280,6.850],[51.260,6.850],[51.260,6.800]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 7', polygon: [[51.260,6.830],[51.260,6.880],[51.240,6.880],[51.240,6.830]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 8', polygon: [[51.210,6.830],[51.210,6.890],[51.195,6.890],[51.195,6.830]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 9', polygon: [[51.175,6.790],[51.175,6.840],[51.155,6.840],[51.155,6.790]] },
+    { city: 'Düsseldorf', name: 'Stadtbezirk 10', polygon: [[51.175,6.840],[51.175,6.900],[51.155,6.900],[51.155,6.840]] },
+
+    // === LEIPZIG (10 Stadtbezirke) ===
+    { city: 'Leipzig', name: 'Mitte', polygon: [[51.345,12.360],[51.345,12.410],[51.320,12.410],[51.320,12.360]] },
+    { city: 'Leipzig', name: 'Nordost', polygon: [[51.370,12.380],[51.370,12.460],[51.345,12.460],[51.345,12.380]] },
+    { city: 'Leipzig', name: 'Ost', polygon: [[51.340,12.410],[51.340,12.490],[51.320,12.490],[51.320,12.410]] },
+    { city: 'Leipzig', name: 'Südost', polygon: [[51.320,12.380],[51.320,12.450],[51.300,12.450],[51.300,12.380]] },
+    { city: 'Leipzig', name: 'Süd', polygon: [[51.320,12.340],[51.320,12.400],[51.300,12.400],[51.300,12.340]] },
+    { city: 'Leipzig', name: 'Südwest', polygon: [[51.320,12.290],[51.320,12.350],[51.300,12.350],[51.300,12.290]] },
+    { city: 'Leipzig', name: 'West', polygon: [[51.345,12.290],[51.345,12.350],[51.320,12.350],[51.320,12.290]] },
+    { city: 'Leipzig', name: 'Altwest', polygon: [[51.355,12.300],[51.355,12.340],[51.345,12.340],[51.345,12.300]] },
+    { city: 'Leipzig', name: 'Nordwest', polygon: [[51.370,12.310],[51.370,12.370],[51.350,12.370],[51.350,12.310]] },
+    { city: 'Leipzig', name: 'Nord', polygon: [[51.375,12.360],[51.375,12.410],[51.355,12.410],[51.355,12.360]] },
+
+    // === KIEL (vorhandene Daten) ===
+    { city: 'Kiel', name: 'Kiel-Mitte', polygon: [[54.305,10.110],[54.305,10.160],[54.335,10.160],[54.335,10.110]] },
+    { city: 'Kiel', name: 'Kiel-Wik', polygon: [[54.335,10.100],[54.335,10.145],[54.370,10.145],[54.370,10.100]] },
+    { city: 'Kiel', name: 'Gaarden-Ost', polygon: [[54.295,10.140],[54.295,10.185],[54.320,10.185],[54.320,10.140]] },
+    { city: 'Kiel', name: 'Ravensberg', polygon: [[54.310,10.095],[54.310,10.130],[54.330,10.130],[54.330,10.095]] },
+    { city: 'Kiel', name: 'Elmschenhagen', polygon: [[54.280,10.115],[54.280,10.165],[54.305,10.165],[54.305,10.115]] },
+    { city: 'Kiel', name: 'Suchsdorf', polygon: [[54.355,10.095],[54.355,10.140],[54.390,10.140],[54.390,10.095]] },
+    { city: 'Kiel', name: 'Pries-Friedrichsort', polygon: [[54.390,10.140],[54.390,10.200],[54.430,10.200],[54.430,10.140]] },
+    { city: 'Kiel', name: 'Neumühlen-Dietrichsdorf', polygon: [[54.290,10.155],[54.290,10.210],[54.315,10.210],[54.315,10.155]] },
+    { city: 'Kiel', name: 'Wellingdorf', polygon: [[54.285,10.185],[54.285,10.225],[54.305,10.225],[54.305,10.185]] },
+    { city: 'Kiel', name: 'Ellerbek', polygon: [[54.315,10.165],[54.315,10.200],[54.340,10.200],[54.340,10.165]] },
+];
+
+// Alle Länder der Erde (UN-Mitgliedsstaaten + Beobachter) mit Zentrumskoordinaten und Radius
+const WORLD_COUNTRIES = [
+    {name:'Afghanistan',center:[33.9391,67.7100],radius:400},{name:'Ägypten',center:[26.8206,30.8025],radius:500},{name:'Albanien',center:[41.1533,20.1683],radius:150},{name:'Algerien',center:[28.0339,1.6596],radius:800},{name:'Andorra',center:[42.5063,1.5218],radius:20},
+    {name:'Angola',center:[-12.3541,17.5235],radius:600},{name:'Antigua und Barbuda',center:[17.0608,-61.7964],radius:15},{name:'Äquatorialguinea',center:[1.6508,10.2679],radius:100},{name:'Argentinien',center:[-38.4161,-63.6167],radius:700},{name:'Armenien',center:[40.0691,45.0382],radius:100},
+    {name:'Aserbaidschan',center:[40.1431,47.5769],radius:200},{name:'Äthiopien',center:[9.1450,40.4897],radius:600},{name:'Australien',center:[-25.2744,133.7751],radius:1200},{name:'Bahamas',center:[25.0259,-77.3963],radius:200},{name:'Bahrain',center:[26.0667,50.5577],radius:15},
+    {name:'Bangladesch',center:[23.6850,90.3563],radius:200},{name:'Barbados',center:[13.1939,-59.5432],radius:15},{name:'Belarus',center:[53.7098,27.9534],radius:300},{name:'Belgien',center:[50.8503,4.3517],radius:100},{name:'Belize',center:[17.1899,-88.4976],radius:100},
+    {name:'Benin',center:[9.3077,2.3158],radius:200},{name:'Bhutan',center:[27.5142,90.4336],radius:150},{name:'Bolivien',center:[-16.2902,-63.5887],radius:500},{name:'Bosnien und Herzegowina',center:[43.9159,17.6791],radius:150},{name:'Botswana',center:[-22.3285,24.6849],radius:400},
+    {name:'Brasilien',center:[-14.2350,-51.9253],radius:1000},{name:'Brunei',center:[4.5353,114.7277],radius:80},{name:'Bulgarien',center:[42.7339,25.4858],radius:200},{name:'Burkina Faso',center:[12.2383,-1.5616],radius:350},{name:'Burundi',center:[-3.3741,29.9184],radius:100},
+    {name:'Chile',center:[-35.6751,-71.5430],radius:600},{name:'China',center:[35.8617,104.1954],radius:1500},{name:'Costa Rica',center:[9.7489,-83.7534],radius:150},{name:'Dänemark',center:[56.2639,9.5018],radius:150},{name:'Deutschland',center:[51.1657,10.4515],radius:250},
+    {name:'Dominica',center:[15.4150,-61.3710],radius:15},{name:'Dominikanische Republik',center:[18.7357,-70.1627],radius:150},{name:'Dschibuti',center:[11.8251,42.5903],radius:60},{name:'Ecuador',center:[-1.8312,-78.1834],radius:200},{name:'El Salvador',center:[13.7942,-88.8965],radius:100},
+    {name:'Elfenbeinküste',center:[7.5400,-5.5471],radius:250},{name:'Eritrea',center:[15.1794,39.7823],radius:200},{name:'Estland',center:[58.5953,25.0136],radius:150},{name:'Eswatini',center:[-26.5225,31.4659],radius:70},{name:'Fidschi',center:[-17.7134,178.0650],radius:150},
+    {name:'Finnland',center:[61.9241,25.7482],radius:400},{name:'Frankreich',center:[46.6034,1.8883],radius:400},{name:'Gabun',center:[-0.8037,11.6094],radius:250},{name:'Gambia',center:[13.4432,-15.3101],radius:80},{name:'Georgien',center:[42.3154,43.3569],radius:150},
+    {name:'Ghana',center:[7.9465,-1.0232],radius:250},{name:'Grenada',center:[12.1165,-61.6790],radius:15},{name:'Griechenland',center:[39.0742,21.8243],radius:250},{name:'Guatemala',center:[15.7835,-90.2308],radius:200},{name:'Guinea',center:[9.9456,-9.6966],radius:200},
+    {name:'Guinea-Bissau',center:[11.8037,-15.1804],radius:80},{name:'Guyana',center:[4.8604,-58.9302],radius:200},{name:'Haiti',center:[18.9712,-72.2852],radius:100},{name:'Honduras',center:[15.2000,-86.2419],radius:200},{name:'Indien',center:[20.5937,78.9629],radius:800},
+    {name:'Indonesien',center:[-0.7893,113.9213],radius:800},{name:'Irak',center:[33.2232,43.6793],radius:300},{name:'Iran',center:[32.4279,53.6880],radius:500},{name:'Irland',center:[53.1424,-7.6921],radius:200},{name:'Island',center:[64.9631,-19.0208],radius:250},
+    {name:'Israel',center:[31.0461,34.8516],radius:100},{name:'Italien',center:[41.8719,12.5674],radius:350},{name:'Jamaika',center:[18.1096,-77.2975],radius:100},{name:'Japan',center:[36.2048,138.2529],radius:500},{name:'Jemen',center:[15.5527,48.5164],radius:300},
+    {name:'Jordanien',center:[30.5852,36.2384],radius:150},{name:'Kambodscha',center:[12.5657,104.9910],radius:200},{name:'Kamerun',center:[7.3697,12.3547],radius:350},{name:'Kanada',center:[56.1304,-106.3468],radius:1200},{name:'Kap Verde',center:[16.0021,-24.0132],radius:80},
+    {name:'Kasachstan',center:[48.0196,66.9237],radius:700},{name:'Katar',center:[25.3548,51.1839],radius:60},{name:'Kenia',center:[-0.0236,37.9062],radius:350},{name:'Kirgisistan',center:[41.2044,74.7661],radius:250},{name:'Kiribati',center:[-3.3704,-168.7340],radius:150},
+    {name:'Kolumbien',center:[4.5709,-74.2973],radius:500},{name:'Komoren',center:[-11.8750,43.8722],radius:40},{name:'Kongo (Dem. Rep.)',center:[-4.0383,21.7587],radius:700},{name:'Kongo (Rep.)',center:[-0.2280,15.8277],radius:300},{name:'Kroatien',center:[45.1000,15.2000],radius:150},
+    {name:'Kuba',center:[21.5218,-77.7812],radius:250},{name:'Kuwait',center:[29.3117,47.4818],radius:60},{name:'Laos',center:[19.8563,102.4955],radius:250},{name:'Lesotho',center:[-29.6100,28.2336],radius:80},{name:'Lettland',center:[56.8796,24.6032],radius:150},
+    {name:'Libanon',center:[33.8547,35.8623],radius:60},{name:'Liberia',center:[6.4281,-9.4295],radius:150},{name:'Libyen',center:[26.3351,17.2283],radius:600},{name:'Liechtenstein',center:[47.1660,9.5554],radius:10},{name:'Litauen',center:[55.1694,23.8813],radius:150},
+    {name:'Luxemburg',center:[49.8153,6.1296],radius:30},{name:'Madagaskar',center:[-18.7669,46.8691],radius:500},{name:'Malawi',center:[-13.2543,34.3015],radius:250},{name:'Malaysia',center:[4.2105,101.9758],radius:400},{name:'Malediven',center:[3.2028,73.2207],radius:50},
+    {name:'Mali',center:[17.5707,-3.9962],radius:500},{name:'Malta',center:[35.9375,14.3754],radius:15},{name:'Marokko',center:[31.7917,-7.0926],radius:350},{name:'Marshallinseln',center:[7.1315,171.1845],radius:80},{name:'Mauretanien',center:[21.0079,10.9408],radius:500},
+    {name:'Mauritius',center:[-20.3484,57.5522],radius:30},{name:'Mexiko',center:[23.6345,-102.5528],radius:700},{name:'Mikronesien',center:[7.4256,150.5508],radius:100},{name:'Moldau',center:[47.4116,28.3699],radius:100},{name:'Monaco',center:[43.7384,7.4246],radius:5},
+    {name:'Mongolei',center:[46.8625,103.8467],radius:600},{name:'Montenegro',center:[42.7087,19.3744],radius:80},{name:'Mosambik',center:[-18.6657,35.5296],radius:400},{name:'Myanmar',center:[21.9162,95.9560],radius:500},{name:'Namibia',center:[-22.9576,18.4904],radius:500},
+    {name:'Nauru',center:[-0.5228,166.9315],radius:10},{name:'Nepal',center:[28.3949,84.1240],radius:200},{name:'Neuseeland',center:[-40.9006,174.8860],radius:350},{name:'Nicaragua',center:[12.1141,-86.2362],radius:200},{name:'Niederlande',center:[52.1326,5.2913],radius:100},
+    {name:'Niger',center:[17.6078,8.0817],radius:550},{name:'Nigeria',center:[9.0820,8.6753],radius:500},{name:'Nordkorea',center:[40.3399,127.5101],radius:200},{name:'Nordmazedonien',center:[41.6086,21.7453],radius:100},{name:'Norwegen',center:[60.4720,8.4689],radius:400},
+    {name:'Oman',center:[21.4735,55.9754],radius:350},{name:'Österreich',center:[47.5162,14.5501],radius:150},{name:'Osttimor',center:[-8.8742,125.7275],radius:80},{name:'Pakistan',center:[30.3753,69.3451],radius:500},{name:'Palau',center:[7.5150,134.5825],radius:40},
+    {name:'Palästina',center:[31.9522,35.2332],radius:40},{name:'Panama',center:[8.5380,-80.7821],radius:150},{name:'Papua-Neuguinea',center:[-6.3150,143.9555],radius:400},{name:'Paraguay',center:[-23.4425,-58.4438],radius:300},{name:'Peru',center:[-9.1900,-75.0152],radius:500},
+    {name:'Philippinen',center:[12.8797,121.7740],radius:400},{name:'Polen',center:[51.9194,19.1451],radius:300},{name:'Portugal',center:[39.3999,-8.2245],radius:200},{name:'Ruanda',center:[-1.9403,29.8739],radius:80},{name:'Rumänien',center:[45.9432,24.9668],radius:250},
+    {name:'Russland',center:[61.5240,105.3188],radius:1800},{name:'Salomonen',center:[-9.6457,160.1562],radius:150},{name:'Sambia',center:[-13.1339,27.8493],radius:400},{name:'Samoa',center:[-13.7590,-172.1046],radius:80},{name:'San Marino',center:[43.9424,12.4578],radius:5},
+    {name:'São Tomé und Príncipe',center:[0.1864,6.6131],radius:20},{name:'Saudi-Arabien',center:[23.8859,45.0792],radius:600},{name:'Schweden',center:[60.1282,18.6435],radius:400},{name:'Schweiz',center:[46.8182,8.2275],radius:120},{name:'Senegal',center:[14.4974,-14.4524],radius:200},
+    {name:'Serbien',center:[44.0165,21.0059],radius:150},{name:'Seychellen',center:[-4.6796,55.4920],radius:40},{name:'Sierra Leone',center:[8.4606,-11.7799],radius:120},{name:'Simbabwe',center:[-19.0154,29.1549],radius:300},{name:'Singapur',center:[1.3521,103.8198],radius:15},
+    {name:'Slowakei',center:[48.6690,19.6990],radius:120},{name:'Slowenien',center:[46.1512,14.9955],radius:80},{name:'Somalia',center:[5.1521,46.1996],radius:350},{name:'Spanien',center:[40.4637,-3.7492],radius:350},{name:'Sri Lanka',center:[7.8731,80.7718],radius:150},
+    {name:'St. Kitts und Nevis',center:[17.3578,-62.7830],radius:10},{name:'St. Lucia',center:[13.9094,-60.9789],radius:10},{name:'St. Vincent und die Grenadinen',center:[13.2528,-61.1972],radius:15},{name:'Südafrika',center:[-30.5595,22.9375],radius:600},{name:'Sudan',center:[15.8905,30.4418],radius:600},
+    {name:'Südkorea',center:[35.9078,127.7669],radius:200},{name:'Südsudan',center:[6.8770,31.3070],radius:350},{name:'Suriname',center:[3.9193,-56.0278],radius:150},{name:'Syrien',center:[34.8021,38.9968],radius:200},{name:'Tadschikistan',center:[38.8610,71.2761],radius:250},
+    {name:'Tansania',center:[-6.3690,34.8888],radius:500},{name:'Thailand',center:[15.8700,100.9925],radius:350},{name:'Togo',center:[8.6195,0.8248],radius:150},{name:'Tonga',center:[-21.1790,-175.1982],radius:80},{name:'Trinidad und Tobago',center:[10.6918,-61.2225],radius:30},
+    {name:'Tschad',center:[15.4542,18.7322],radius:500},{name:'Tschechien',center:[49.8175,15.4730],radius:150},{name:'Tunesien',center:[33.8869,9.5375],radius:200},{name:'Türkei',center:[38.9637,35.2433],radius:400},{name:'Turkmenistan',center:[38.9697,59.5563],radius:350},
+    {name:'Tuvalu',center:[-7.1095,177.6493],radius:10},{name:'Uganda',center:[1.3733,32.2903],radius:250},{name:'Ukraine',center:[48.3794,31.1656],radius:400},{name:'Ungarn',center:[47.1625,19.5033],radius:180},{name:'Uruguay',center:[-32.5228,-55.7658],radius:200},
+    {name:'Usbekistan',center:[41.3775,64.5853],radius:350},{name:'Vanuatu',center:[-15.3767,166.9592],radius:100},{name:'Vatikanstadt',center:[41.9029,12.4534],radius:2},{name:'Venezuela',center:[6.4238,-66.5897],radius:500},{name:'Vereinigte Arabische Emirate',center:[23.4241,53.8478],radius:150},
+    {name:'Vereinigte Staaten',center:[37.0902,-95.7129],radius:1200},{name:'Vereinigtes Königreich',center:[55.3781,-3.4360],radius:300},{name:'Vietnam',center:[14.0583,108.2772],radius:350},{name:'Zentralafrikanische Republik',center:[6.6111,20.9394],radius:400},{name:'Zypern',center:[35.1264,33.4299],radius:80},
+];
+
+const ACHIEVEMENTS = [
+    { id: 'first_import', icon: '📥', title: 'Erster Import', desc: 'Ersten Datei-Import erfolgreich abgeschlossen', check: s => s.importCount >= 1 },
+    { id: 'first_step', icon: '👣', title: 'Erster Schritt', desc: 'Ersten Datenpunkt importiert', check: s => s.logs.length >= 1 },
+    { id: 'explorer10', icon: '🗺', title: '10 Orte', desc: '10 verschiedene Adressen besucht', check: s => new Set(s.logs.map(l=>l.address)).size >= 10 },
+    { id: 'explorer50', icon: '🌍', title: '50 Orte', desc: '50 verschiedene Adressen besucht', check: s => new Set(s.logs.map(l=>l.address)).size >= 50 },
+    { id: 'explorer100', icon: '🌟', title: '100 Orte', desc: '100 verschiedene Adressen besucht', check: s => new Set(s.logs.map(l=>l.address)).size >= 100 },
+    { id: 'marathon', icon: '🏃', title: 'Daten-Marathon', desc: '100+ Datenpunkte gesammelt', check: s => s.logs.length >= 100 },
+    { id: 'dataminer', icon: '⛏', title: 'Daten-Minenarbeiter', desc: '500+ Datenpunkte gesammelt', check: s => s.logs.length >= 500 },
+    { id: 'rainy', icon: '🌧', title: 'Regentrotzer', desc: '10 Punkte bei Regen erfasst', check: s => s.logs.filter(l=>l.weather&&l.weather.condition==='Regen').length >= 10 },
+    { id: 'early_bird', icon: '🌅', title: 'Frühaufsteher', desc: '5 Punkte vor 7 Uhr morgens', check: s => s.logs.filter(l=>l.timestamp&&l.timestamp.getHours()<7).length >= 5 },
+    { id: 'night_owl', icon: '🦉', title: 'Nachteule', desc: '5 Punkte nach 23 Uhr', check: s => s.logs.filter(l=>l.timestamp&&l.timestamp.getHours()>=23).length >= 5 },
+    { id: 'anomaly', icon: '⚠', title: 'Langweiler', desc: 'Erste Verweildauer-Anomalie erkannt', check: s => s.logs.length >= 2 },
+    { id: 'district3', icon: '🏘', title: 'Drei Stadtteile', desc: '3 verschiedene Stadtteile erkundet', check: s => {
+        const visited = new Set(); s.logs.forEach(l => { const d = findDistrict(l.coords); if (d) visited.add(d.city + ':' + d.name); }); return visited.size >= 3;
+    }},
+    { id: 'district10', icon: '🏙', title: 'Zehn Stadtteile', desc: '10 verschiedene Stadtteile erkundet', check: s => {
+        const visited = new Set(); s.logs.forEach(l => { const d = findDistrict(l.coords); if (d) visited.add(d.city + ':' + d.name); }); return visited.size >= 10;
+    }},
+    { id: 'city3', icon: '🏛', title: 'Drei Städte', desc: 'In 3 verschiedenen Städten aktiv', check: s => {
+        const cities = new Set(); s.logs.forEach(l => { const d = findDistrict(l.coords); if (d) cities.add(d.city); }); return cities.size >= 3;
+    }},
+    { id: 'country2', icon: '🌎', title: 'Grenzgänger', desc: '2 Länder besucht', check: s => s.visitedCountries.size >= 2 },
+    { id: 'country5', icon: '🌏', title: 'Weltreisender', desc: '5 Länder besucht', check: s => s.visitedCountries.size >= 5 },
+    { id: 'km5', icon: '🥉', title: '5 km² erforscht', desc: 'Fog of War lichtet sich', check: s => calcExploreArea(s.logs) >= 5 },
+    { id: 'km50', icon: '🥈', title: '50 km² erforscht', desc: 'Großer Entdecker', check: s => calcExploreArea(s.logs) >= 50 },
+    { id: 'km200', icon: '🥇', title: '200 km² erforscht', desc: 'Legendärer Kundschafter', check: s => calcExploreArea(s.logs) >= 200 },
+];
+
+// =====================================================================
+// STATE
+// =====================================================================
+let map, tileLayer, overlayGroup, districtLayers = [], countryLayers = [], highlightLayers = [];
+let parsedLogs = [];
+let currentFilter = 'heute';
+let isDarkMode = false;
+let fogOpacityValue = 0.75;
+let exploreRadiusValue = 1000;
+let currentTab = 'karte';
+let importCount = 0;
+let visitedCountries = new Set();
+let worldGeoJSON = null; // Geladene Weltkarten-GeoJSON
+let worldCountryLookup = {}; // name → feature mapping
+let fogUpdatePending = false;
+let glowPoints = [];
+let selectedDistrict = null;
+
+// =====================================================================
+// INIT
+// =====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    map = L.map('map', {
+        center: [54.3232, 10.1234],
+        zoom: 12,
+        zoomControl: true,
+        attributionControl: true,
     });
 
-    function toggleSettings(open) {
-        if (isUploading && !open) {
-            alert("Bitte warte, bis das Hinzufügen der Daten abgeschlossen ist.");
-            return;
-        }
-        document.getElementById('settingsModal').style.display = open ? 'flex' : 'none';
+    overlayGroup = L.layerGroup().addTo(map);
+
+    // localStorage-Test: funktioniert es von dieser URL?
+    try {
+        localStorage.setItem('_test_storage', '1');
+        localStorage.removeItem('_test_storage');
+        console.log('✅ localStorage verfügbar');
+    } catch(e) {
+        console.error('❌ localStorage NICHT verfügbar (file://?):', e.message);
+        showToast('⚠ localStorage nicht verfügbar — Daten bleiben nicht erhalten. App über http:// öffnen!');
     }
 
-    function setTheme(theme) {
-        if(theme === 'sand') {
-            document.documentElement.setAttribute('data-theme', 'sand');
-            document.getElementById('theme-sand-btn').classList.add('active');
-            document.getElementById('theme-beige-btn').classList.remove('active');
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-            document.getElementById('theme-beige-btn').classList.add('active');
-            document.getElementById('theme-sand-btn').classList.remove('active');
-        }
-        localStorage.setItem("app_theme", theme);
-    }
+    map.on('click', () => { closeDetailPanel(); });
+    map.on('moveend zoomend', () => scheduleFogUpdate());
+    map.on('moveend zoomend', () => drawExploredArea());
 
-    function switchView(viewName) {
-        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    changeMapLayer();
 
-        if(viewName === 'dashboard') {
-            document.getElementById('view-dashboard').classList.add('active');
-            event.target.classList.add('active');
-            renderDashboardList();
-        } else if(viewName === 'explore') {
-            document.getElementById('view-explore').classList.add('active');
-            event.target.classList.add('active');
-            setTimeout(() => {
-                initMap();
-                renderMapPoints();
-            }, 50);
-        }
-    }
-
-    function initMap() {
-        if (map !== null) return; 
-        map = L.map('map').setView([54.3233, 10.1394], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
-        trackerLayer = L.layerGroup().addTo(map);
-    }
-
-    function loadDataFromStorage() {
-        const saved = localStorage.getItem("tracked_places");
-        if (saved) { allPoints = JSON.parse(saved); }
-        calculateCounters();
-        renderDashboardList();
-    }
-
-    function parseGermanDate(dateStr) {
+    const stored = localStorage.getItem('fog_of_war_data_v6');
+    if (stored) {
         try {
-            const parts = dateStr.split(', ');
-            const dParts = parts[0].split('.');
-            const tParts = parts[1].split(':');
-            return new Date(dParts[2], dParts[1] - 1, dParts[0], tParts[0], tParts[1]);
-        } catch(e) { return new Date(0); }
+            const data = JSON.parse(stored);
+            const logCount = data.logs?.length || 0;
+            parsedLogs = data.logs || [];
+            parsedLogs.forEach(l => { l.timestamp = new Date(l.timestamp); });
+            importCount = data.importCount || 0;
+            if (data.visitedCountries) visitedCountries = new Set(data.visitedCountries);
+            if (data.ui) {
+                document.getElementById('yourWayToggle').checked = data.ui.yourWay ?? false;
+                document.getElementById('exploreModeToggle').checked = data.ui.exploreMode ?? true;
+                document.getElementById('fogToggle').checked = data.ui.fog ?? true;
+                document.getElementById('countryModeToggle').checked = data.ui.countryMode ?? false;
+                document.getElementById('mapModeSelect').value = data.ui.mapMode || 'light';
+                document.getElementById('weatherFilter').value = data.ui.weather || 'alle';
+                fogOpacityValue = data.ui.fogOpacity ?? 0.75;
+                exploreRadiusValue = data.ui.exploreRadius ?? 1000;
+            }
+            console.log('📦 Loaded from localStorage: logs=' + logCount + ' countries=' + visitedCountries.size + ' keys=' + Object.keys(data).join(','));
+            if (logCount === 0 && data.logs) console.warn('⚠ logs existiert aber ist leer');
+            if (logCount > 0) showToast('📦 ' + logCount + ' Logs aus localStorage geladen');
+        } catch(e) { console.warn('Storage parse error', e); }
+    } else {
+        console.log('📭 No data in localStorage (key: fog_of_war_data_v6)');
+        // Prüfe ob localStorage generell Daten hat
+        const allKeys = Object.keys(localStorage).filter(k => k !== '_test_storage');
+        if (allKeys.length) console.log('   andere keys in localStorage:', allKeys);
     }
+    updateDataStatus();
 
-    function calculateCounters() {
-        const now = new Date();
-        let todayCount = 0, weekCount = 0, yearCount = 0;
+    loadCountryUI();
+    loadWorldGeoJSON();
 
-        allPoints.forEach(p => {
-            const pDate = parseGermanDate(p.timestamp);
-            if(pDate.toDateString() === now.toDateString()) todayCount++;
-            if(pDate >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)) weekCount++;
-            if(pDate.getFullYear() === now.getFullYear()) yearCount++;
-        });
+    // Default-Zeitfenster: Immer (alle Daten sichtbar)
+    changeTimeframe('immer');
 
-        document.getElementById('count-all').innerText = allPoints.length;
-        document.getElementById('count-today').innerText = todayCount;
-        document.getElementById('count-week').innerText = weekCount;
-        document.getElementById('count-year').innerText = yearCount;
-    }
+    // Kritischer Fix: invalidateSize() nach Initialisierung
+    requestAnimationFrame(() => {
+        map.invalidateSize(true);
+        updateDisplay();
+    });
+});
 
-    function setTimeFilter(filter) {
-        currentTimeFilter = filter;
-        document.querySelectorAll('.filter-card').forEach(el => el.classList.remove('selected'));
-        document.getElementById(`filter-${filter}`).classList.add('selected');
-        renderDashboardList();
-    }
-
-    function getFilteredPoints() {
-        const now = new Date();
-        return allPoints.filter(p => {
-            const pDate = parseGermanDate(p.timestamp);
-            if (currentTimeFilter === 'today') return pDate.toDateString() === now.toDateString();
-            if (currentTimeFilter === 'week') return pDate >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            if (currentTimeFilter === 'year') return pDate.getFullYear() === now.getFullYear();
-            return true;
-        });
-    }
-
-    function renderDashboardList() {
-        const listEl = document.getElementById('logList');
-        const titleEl = document.getElementById('list-title');
-        const filtered = getFilteredPoints();
-        const filterNames = { all: 'Immer', today: 'Heute', week: 'Diese Woche', year: 'Dieses Jahr' };
-        
-        titleEl.innerText = `Einträge (${filterNames[currentTimeFilter]})`;
-        listEl.innerHTML = '';
-        
-        if(filtered.length === 0) {
-            listEl.innerHTML = `<li class="location-item" style="color: var(--text-muted)">Keine Einträge für diesen Zeitraum gefunden.</li>`;
+// =====================================================================
+// WORLD GEOJSON LADEN (via world-atlas, präzise Ländergrenzen)
+// =====================================================================
+function loadWorldGeoJSON() {
+    const cached = localStorage.getItem('world_geojson_cache');
+    if (cached) {
+        try {
+            const data = JSON.parse(cached);
+            worldGeoJSON = data;
+            data.features.forEach(f => {
+                const name = f.properties && (f.properties.name || f.properties.NAME || f.properties.NAME_LONG || '');
+                if (name) worldCountryLookup[name] = f;
+            });
+            fillVisitedCountriesFromLogs();
             return;
+        } catch(e) {}
+    }
+    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+        .then(r => {
+            if (!r.ok) throw new Error('Fetch failed');
+            return r.json();
+        })
+        .then(topology => {
+            const countries = topojson.feature(topology, topology.objects.countries);
+            worldGeoJSON = countries;
+            // Namen aus den properties ermitteln
+            countries.features.forEach(f => {
+                let name = f.properties.name || '';
+                if (!name) name = f.properties.NAME || '';
+                if (!name) name = f.properties.NAME_LONG || '';
+                if (name) worldCountryLookup[name] = f;
+            });
+            try { localStorage.setItem('world_geojson_cache', JSON.stringify(countries)); } catch(e) {}
+            fillVisitedCountriesFromLogs();
+            updateDisplay();
+        })
+        .then(topology => {
+            const countries = topojson.feature(topology, topology.objects.countries);
+            worldGeoJSON = countries;
+            // Namen aus den properties ermitteln
+            countries.features.forEach(f => {
+                let name = f.properties.name || '';
+                if (!name) name = f.properties.NAME || '';
+                if (!name) name = f.properties.NAME_LONG || '';
+                if (name) worldCountryLookup[name] = f;
+            });
+            try { localStorage.setItem('world_geojson_cache', JSON.stringify(countries)); } catch(e) {}
+            if (document.getElementById('countryModeToggle').checked) updateDisplay();
+            showToast('🌍 Weltkarte geladen');
+        })
+        .catch(() => {
+            showToast('⚠️ Weltkarte konnte nicht geladen werden');
+        });
+}
+
+// =====================================================================
+// SCHEDULED FOG UPDATE (Debounced)
+// =====================================================================
+function scheduleFogUpdate() {
+    if (fogUpdatePending) return;
+    fogUpdatePending = true;
+    requestAnimationFrame(() => {
+        fogUpdatePending = false;
+        if (document.getElementById('fogToggle').checked) drawFog(getFilteredLogs());
+    });
+}
+
+// =====================================================================
+// TABS
+// =====================================================================
+function switchTab(name) {
+    currentTab = name;
+    ['karte','entdeckt','einstellungen'].forEach(t => {
+        document.getElementById('panel-' + t).classList.toggle('hidden', t !== name);
+        document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    });
+    if (name === 'entdeckt') updateExploreTab();
+    if (name === 'karte') scheduleFogUpdate();
+    requestAnimationFrame(() => { map.invalidateSize(true); });
+}
+
+// =====================================================================
+// THEME + MAP LAYER
+// =====================================================================
+function toggleTheme() {
+    isDarkMode = !isDarkMode;
+    document.body.classList.toggle('dark-theme', isDarkMode);
+    const select = document.getElementById('mapModeSelect');
+    if (select.value === 'light' && isDarkMode) { select.value = 'dark'; changeMapLayer(); }
+    else if (select.value === 'dark' && !isDarkMode) { select.value = 'light'; changeMapLayer(); }
+    else updateDisplay();
+}
+
+function changeMapLayer() {
+    const mode = document.getElementById('mapModeSelect').value;
+    if (tileLayer) map.removeLayer(tileLayer);
+    const [url, attr] = TILE_LAYERS[mode];
+    tileLayer = L.tileLayer(url, { attribution: attr }).addTo(map);
+    saveState();
+    updateDisplay();
+}
+
+// =====================================================================
+// SETTINGS HANDLERS
+// =====================================================================
+function updateFogOpacity(val) {
+    fogOpacityValue = val / 100;
+    document.getElementById('fogOpacityLabel').textContent = val + '%';
+    document.getElementById('fog-backdrop').style.background = `rgba(10, 10, 20, ${fogOpacityValue})`;
+    saveState();
+    if (document.getElementById('fogToggle').checked) scheduleFogUpdate();
+}
+
+function updateExploreRadius(val) {
+    exploreRadiusValue = parseInt(val);
+    document.getElementById('exploreRadiusLabel').textContent = val + ' km';
+    saveState();
+}
+
+function forceResave() {
+    console.log('🔍 parsedLogs', parsedLogs.length, 'visitedCountries', visitedCountries.size);
+    console.log('🔍 localStorage vorher:', localStorage.getItem('fog_of_war_data_v6')?.substring(0, 200));
+    saveState();
+    const after = localStorage.getItem('fog_of_war_data_v6');
+    const hasLogs = after ? JSON.parse(after).logs?.length : 0;
+    console.log('🔍 localStorage nachher: logs=', hasLogs, 'größe=', after ? (new Blob([after]).size/1024).toFixed(1)+'KB' : '0');
+    showToast(`💾 Gespeichert: ${parsedLogs.length} Logs, ${visitedCountries.size} Länder → ${hasLogs} in localStorage`);
+}
+
+function clearAllData() {
+    if (!confirm('Alle gespeicherten Logs und Einstellungen löschen?')) return;
+    parsedLogs = [];
+    importCount = 0;
+    visitedCountries = new Set();
+    localStorage.removeItem('fog_of_war_data_v6');
+    updateDisplay();
+    showToast('Alle Daten gelöscht');
+}
+
+function updateDataStatus() {
+    const el = document.getElementById('dataStatus');
+    const stored = localStorage.getItem('fog_of_war_data_v6');
+    let inStorage = 0;
+    if (stored) {
+        try { inStorage = JSON.parse(stored).logs?.length || 0; } catch(e) {}
+        const sizeKB = (new Blob([stored]).size / 1024).toFixed(1);
+        const inMem = parsedLogs.length;
+        const ok = inMem === inStorage ? '✅' : '⚠';
+        el.textContent = `${ok} Im Speicher: ${inMem} Logs · Im localStorage: ${inStorage} Logs · ${sizeKB} KB`;
+        el.classList.remove('hidden');
+    } else {
+        if (parsedLogs.length > 0) {
+            el.textContent = `⚠ ${parsedLogs.length} Logs im Speicher, aber NICHT in localStorage!`;
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    }
+}
+
+function saveState() {
+    try {
+        // NIEMALS leere Daten über gespeicherte Daten schreiben (außer bei clearAllData)
+        if (parsedLogs.length === 0) {
+            const existing = localStorage.getItem('fog_of_war_data_v6');
+            if (existing) {
+                const parsed = JSON.parse(existing);
+                if (parsed.logs?.length > 0) {
+                    console.warn('⚠ saveState blockiert: 0 Logs im Speicher, aber ' + parsed.logs.length + ' in localStorage — Überschreiben verhindert');
+                    return;
+                }
+            }
+        }
+        const data = JSON.stringify({
+            logs: parsedLogs,
+            importCount,
+            visitedCountries: Array.from(visitedCountries),
+            ui: {
+                yourWay: document.getElementById('yourWayToggle').checked,
+                exploreMode: document.getElementById('exploreModeToggle').checked,
+                fog: document.getElementById('fogToggle').checked,
+                countryMode: document.getElementById('countryModeToggle').checked,
+                mapMode: document.getElementById('mapModeSelect').value,
+                weather: document.getElementById('weatherFilter').value,
+                fogOpacity: fogOpacityValue,
+                exploreRadius: exploreRadiusValue,
+            }
+        });
+        const sizeKB = (new Blob([data]).size / 1024).toFixed(1);
+        if (sizeKB > 4000) console.warn('⚠ localStorage fast voll:', sizeKB, 'KB');
+        localStorage.setItem('fog_of_war_data_v6', data);
+        updateDataStatus();
+        console.log('💾 saveState: ok,', parsedLogs.length, 'logs,', visitedCountries.size, 'countries,', sizeKB, 'KB');
+    } catch(e) {
+        console.error('❌ saveState failed:', e);
+        showToast('❌ Speicherfehler: ' + e.message + ' — ggf. Daten exportieren und localStorage leeren');
+    }
+}
+
+// =====================================================================
+// FILE IMPORT (CSV + TXT)
+// =====================================================================
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async e => {
+        document.getElementById('importStatusContainer').classList.remove('hidden');
+        document.getElementById('importStats').classList.add('hidden');
+        try {
+            const text = e.target.result;
+            const isTxt = file.name.endsWith('.txt') || text.includes('|');
+            if (isTxt) {
+                await parseAndGeocodeTXT(text);
+            } else {
+                await parseAndGeocodeCSV(text);
+            }
+            importCount++;
+        } catch(err) {
+            console.error('❌ Import-Fehler:', err);
+            showToast('❌ Import fehlgeschlagen: ' + err.message);
+        }
+        document.getElementById('importStatusContainer').classList.add('hidden');
+        saveState();
+        updateDisplay();
+        updateExploreTab();
+        document.getElementById('csvFileInput').value = '';
+    };
+    reader.readAsText(file);
+}
+
+// =====================================================================
+// TXT PARSER (|...|-Format) — ROBUST & FEHLERTOLERANT
+// =====================================================================
+async function parseAndGeocodeTXT(text) {
+    if (!text) return;
+
+    // Extrahiere Einträge zwischen |...|
+    // Toleriert: Whitespace, unvollständige Zeilen, gemischte Zeilenumbrüche
+    const entries = [];
+    let current = '';
+    let inPipe = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '|') {
+            if (inPipe) {
+                // Ende eines Eintrags
+                const trimmed = current.trim();
+                if (trimmed) entries.push(trimmed);
+                current = '';
+                inPipe = false;
+            } else {
+                inPipe = true;
+                current = '';
+            }
+        } else if (inPipe) {
+            current += ch;
+        }
+    }
+    // Falls letzter Eintrag nicht geschlossen
+    if (inPipe && current.trim()) entries.push(current.trim());
+
+    if (entries.length === 0) {
+        showToast('Keine gültigen |...|-Einträge gefunden');
+        return;
+    }
+
+    document.getElementById('imp-total').textContent = entries.length;
+    document.getElementById('importStats').classList.remove('hidden');
+
+    const tempLogs = [];
+    let ok = 0, fail = 0;
+    const failedAddr = [];
+
+    const errLog = document.getElementById('importErrorLog');
+
+    for (let i = 0; i < entries.length; i++) {
+        const raw = entries[i];
+        const pct = Math.round(((i + 1) / entries.length) * 100);
+        document.getElementById('import-progress-bar').style.width = pct + '%';
+        document.getElementById('importPercent').textContent = pct + '%';
+        document.getElementById('importStatusText').textContent = `Parsing ${i + 1} / ${entries.length}…`;
+        document.getElementById('liveAddressTracker').textContent = raw.replace(/\n/g, ' | ').substring(0, 60);
+
+        // Koordinaten via Regex extrahieren
+        // Formate: "54.32, 10.12", "54.3232|10.1234", "lat 54.32 lon 10.12"
+        let coords = null;
+        const coordPatterns = [
+            /(-?\d{1,2}\.\d+)\s*[,;:\s|]\s*(-?\d{1,3}\.\d+)/,
+            /lat[:\s]*(-?\d{1,2}\.\d+)[,\s]*lon[:\s]*(-?\d{1,3}\.\d+)/i,
+            /breite[:\s]*(-?\d{1,2}\.\d+)[,\s]*länge[:\s]*(-?\d{1,3}\.\d+)/i,
+            /latitude[:\s]*(-?\d{1,2}\.\d+)[,\s]*longitude[:\s]*(-?\d{1,3}\.\d+)/i,
+        ];
+        for (const pat of coordPatterns) {
+            const m = raw.match(pat);
+            if (m) {
+                const lat = parseFloat(m[1]);
+                const lon = parseFloat(m[2]);
+                if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                    coords = [lat, lon];
+                    break;
+                }
+            }
         }
 
-        filtered.forEach(p => {
-            const li = document.createElement('li');
-            li.className = 'location-item';
-            li.innerHTML = `<span class="time">${p.timestamp}</span><span class="addr">${p.address}</span>`;
-            listEl.appendChild(li);
-        });
+        // Parse Datum/Zeit und Adresse
+        const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+        let timestamp = new Date();
+        let weather = { condition: 'Sonne', text: '☀️ Heiter, 21°C' };
+        let cleanAddress = raw.replace(/\|/g, '').trim();
+
+        for (const line of lines) {
+            // Datum/Zeit erkennen: "25.06.2026, 13:49" oder "25.06.2026,13:49"
+            const dtMatch = line.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s*,\s*(\d{1,2}):(\d{2})/);
+            if (dtMatch) {
+                const [, d, m, y, h, min] = dtMatch;
+                timestamp = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min));
+                // Zufälliges Wetter basierend auf Tag
+                const dayNum = parseInt(d);
+                if (dayNum % 3 === 0) weather = { condition: 'Regen', text: '🌧️ Starkregen, 11°C, Wind: 34 km/h' };
+                else if (dayNum % 5 === 0) weather = { condition: 'Sonne', text: '☀️ Klarer Himmel, 26°C, Wind: 6 km/h' };
+                break;
+            }
+        }
+
+        // Adresse für Geocoding bereinigen (Datum/Zeit + Semikolon entfernen)
+        const addrForGeocode = cleanAddress.replace(/^\d{1,2}\.\d{1,2}\.\d{4}\s*,\s*\d{1,2}:\d{2}\s*;\s*/, '').trim();
+        const address = addrForGeocode || cleanAddress;
+
+        if (coords) {
+            ok++;
+            const country = detectCountry(coords[0], coords[1]);
+            if (country) visitedCountries.add(country);
+            const dateStr = timestamp.toLocaleDateString('de-DE');
+            const timeStr = timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            tempLogs.push({
+                timestamp,
+                dateString: dateStr,
+                timeString: timeStr,
+                address,
+                coords,
+                weather,
+                source: 'txt'
+            });
+        } else {
+            const coords2 = await fetchCoordinates(addrForGeocode);
+            if (coords2) {
+                ok++;
+                const country = detectCountry(coords2[0], coords2[1]);
+                if (country) visitedCountries.add(country);
+                const dateStr = timestamp.toLocaleDateString('de-DE');
+                const timeStr = timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                tempLogs.push({
+                    timestamp,
+                    dateString: dateStr,
+                    timeString: timeStr,
+                    address,
+                    coords: coords2,
+                    weather,
+                    source: 'txt'
+                });
+            } else {
+                fail++;
+                const short = address.split('\n')[0].substring(0, 40);
+                failedAddr.push(short);
+                errLog.textContent = '❌ ' + failedAddr.slice(-5).join('\n❌ ');
+                errLog.classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('imp-ok').textContent = ok;
+        document.getElementById('imp-fail').textContent = fail;
     }
 
-    function renderMapPoints() {
-        if (!trackerLayer) return;
-        trackerLayer.clearLayers();
+    parsedLogs = [...parsedLogs, ...tempLogs].sort((a, b) => a.timestamp - b.timestamp);
+    fillVisitedCountriesFromLogs();
+    document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
+    showToast(`${ok} Einträge importiert${fail ? `, ${fail} Fehler` : ''}`);
+    if (!fail) errLog.classList.add('hidden');
+}
+
+// =====================================================================
+// CSV PARSER (bestehend, aber robuster gemacht)
+// =====================================================================
+async function parseAndGeocodeCSV(csvText) {
+    if (!csvText) return;
+    const lines = csvText.trim().split(/\r?\n/);
+    const tempLogs = [];
+    let currentLog = null;
+
+    lines.forEach(line => {
+        if (line.includes(';')) {
+            if (currentLog) tempLogs.push(currentLog);
+            const [dateTimeStr, street] = line.split(';');
+            const [dateStr, timeStr] = (dateTimeStr || '').split(', ');
+            if (!dateStr || !timeStr || !street) return;
+            const [day, month, year] = dateStr.split('.').map(Number);
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            if (!day || !month || !year || isNaN(hours) || isNaN(minutes)) return;
+            let w = { condition: 'Sonne', text: '☀️ Heiter, 21°C, Wind: 12 km/h' };
+            if (day % 3 === 0) w = { condition: 'Regen', text: '🌧️ Starkregen, 11°C, Wind: 34 km/h' };
+            else if (day % 5 === 0) w = { condition: 'Sonne', text: '☀️ Klarer Himmel, 26°C, Wind: 6 km/h' };
+            currentLog = { timestamp: new Date(year, month-1, day, hours, minutes), dateString: dateStr, timeString: timeStr, addressLines: [street.trim()], weather: w };
+        } else if (currentLog && line.trim()) {
+            currentLog.addressLines.push(line.trim());
+        }
+    });
+    if (currentLog) tempLogs.push(currentLog);
+
+    document.getElementById('imp-total').textContent = tempLogs.length;
+    document.getElementById('importStats').classList.remove('hidden');
+
+    const finalLogs = [];
+    let ok = 0, fail = 0;
+    const failedAddr = [];
+    const errLog = document.getElementById('importErrorLog');
+
+    for (let i = 0; i < tempLogs.length; i++) {
+        const log = tempLogs[i];
+        const pct = Math.round(((i+1) / tempLogs.length) * 100);
+        document.getElementById('import-progress-bar').style.width = pct + '%';
+        document.getElementById('importPercent').textContent = pct + '%';
+        document.getElementById('importStatusText').textContent = `Geocodiere ${i+1} / ${tempLogs.length}…`;
+        document.getElementById('liveAddressTracker').textContent = log.addressLines[0] || '—';
+
+        const addr = log.addressLines.join('\n');
+        const coords = await fetchCoordinates(addr);
+        if (coords) {
+            ok++;
+            const country = detectCountry(coords[0], coords[1]);
+            if (country) visitedCountries.add(country);
+            finalLogs.push({ ...log, address: addr, coords, source: 'csv' });
+        } else {
+            fail++;
+            const short = (log.addressLines[0] || addr).substring(0, 40);
+            failedAddr.push(short);
+            errLog.textContent = '❌ ' + failedAddr.slice(-5).join('\n❌ ');
+            errLog.classList.remove('hidden');
+        }
+        document.getElementById('imp-ok').textContent = ok;
+        document.getElementById('imp-fail').textContent = fail;
+    }
+
+    parsedLogs = [...parsedLogs, ...finalLogs].sort((a,b) => a.timestamp - b.timestamp);
+    fillVisitedCountriesFromLogs();
+    document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
+    showToast(`${ok} Einträge importiert${fail ? `, ${fail} Fehler` : ''}`);
+    if (!fail) errLog.classList.add('hidden');
+}
+
+// =====================================================================
+// GEOCODING (Photon — CORS-freundlich, kein API-Key nötig)
+// =====================================================================
+async function fetchCoordinates(address) {
+    const lines = address.split('\n').filter(l => l.trim());
+    const queries = [
+        lines.join(', '),
+        ...(lines.length > 2 ? [lines.slice(-3).join(', ')] : []),
+        ...(lines.length > 1 ? [lines.slice(-2).join(', ')] : []),
+    ];
+
+    for (const q of [...new Set(queries)]) {
+        try {
+            const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`);
+            if (r.ok) {
+                const data = await r.json();
+                if (data.features?.length > 0) {
+                    const [lon, lat] = data.features[0].geometry.coordinates;
+                    return [lat, lon];
+                }
+            }
+        } catch(e) {}
+        await new Promise(r => setTimeout(r, 300));
+    }
+    return null;
+}
+
+function detectCountry(lat, lon) {
+    if (typeof turf === 'undefined' || !worldGeoJSON || !worldGeoJSON.features) return '';
+    const pt = turf.point([lon, lat]);
+    for (const f of worldGeoJSON.features) {
+        try {
+            if (turf.booleanPointInPolygon(pt, f)) {
+                return f.properties?.name || f.properties?.NAME || f.properties?.NAME_LONG || '';
+            }
+        } catch(e) {}
+    }
+    return '';
+}
+
+function fillVisitedCountriesFromLogs() {
+    if (!parsedLogs.length || typeof turf === 'undefined' || !worldGeoJSON) return;
+    let added = 0;
+    for (const log of parsedLogs) {
+        if (!log.coords) continue;
+        const country = detectCountry(log.coords[0], log.coords[1]);
+        if (country && !visitedCountries.has(country)) {
+            visitedCountries.add(country);
+            added++;
+        }
+    }
+    if (added) {
+        saveState();
+        loadCountryUI();
+    }
+}
+
+// =====================================================================
+// HELPERS
+// =====================================================================
+function calcDistance(c1, c2) {
+    const R = 6371, dLat = (c2[0]-c1[0])*Math.PI/180, dLon = (c2[1]-c1[1])*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(c1[0]*Math.PI/180)*Math.cos(c2[0]*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function calcExploreArea(logs) {
+    // Explored area = unique places (1 unique Ort = 1 km²)
+    if (!logs.length) return 0;
+    return new Set(logs.map(l => l.address).filter(Boolean)).size;
+}
+
+function getFilteredLogs() {
+    const now = new Date();
+    const selectedWeather = document.getElementById('weatherFilter').value;
+    const datePicker = document.getElementById('datePicker');
+    const selectedDate = datePicker && datePicker.value ? new Date(datePicker.value + 'T00:00:00') : null;
+    return parsedLogs.filter(log => {
+        if (selectedWeather !== 'alle' && log.weather && log.weather.condition !== selectedWeather) return false;
+        const diffDays = Math.ceil(Math.abs(now - log.timestamp) / 86400000);
+        switch(currentFilter) {
+            case 'heute': return log.timestamp.toDateString() === now.toDateString();
+            case 'woche': return diffDays <= 7;
+            case 'monat': return log.timestamp.getMonth() === now.getMonth() && log.timestamp.getFullYear() === now.getFullYear();
+            case 'jahr':  return log.timestamp.getFullYear() === now.getFullYear();
+            case 'datum': return selectedDate && log.timestamp.toDateString() === selectedDate.toDateString();
+            default: return true;
+        }
+    });
+}
+
+function onDatePicked() {
+    changeTimeframe('datum');
+}
+
+// =====================================================================
+// DISTRICT LOOKUP
+// =====================================================================
+function pointInPolygon(lat, lon, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][1], yi = polygon[i][0];
+        const xj = polygon[j][1], yj = polygon[j][0];
+        if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+function findDistrict(coords) {
+    if (!coords) return null;
+    const [lat, lon] = coords;
+    for (const d of GERMAN_DISTRICTS) {
+        if (pointInPolygon(lat, lon, d.polygon)) return d;
+    }
+    return null;
+}
+
+function findDistrictsForLogs(logs) {
+    const visited = new Map();
+    logs.forEach(log => {
+        const d = findDistrict(log.coords);
+        if (d) {
+            const key = d.city + ':' + d.name;
+            if (!visited.has(key)) visited.set(key, { ...d, points: [] });
+            visited.get(key).points.push(log);
+        }
+    });
+    return visited;
+}
+
+// =====================================================================
+// FOG OF WAR (Canvas + CSS backdrop-filter via Mask)
+// =====================================================================
+function drawFog(logs) {
+    const fogLayer = document.getElementById('fog-layer');
+    if (!logs.length || !document.getElementById('fogToggle').checked) {
+        fogLayer.classList.remove('visible');
+        return;
+    }
+
+    const mapContainer = document.getElementById('map-container');
+    const w = mapContainer.offsetWidth;
+    const h = mapContainer.offsetHeight;
+    if (!w || !h) return;
+
+    fogLayer.classList.add('visible');
+
+    // Off-screen Canvas für Mask-Erzeugung (nicht im DOM)
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = w;
+    maskCanvas.height = h;
+    const ctx = maskCanvas.getContext('2d');
+
+    // White = fog visible (unexplored), Black = fog hidden (explored)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+
+    // Cut out explored areas with HARD edges (no gradient)
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#ffffff';
+
+    logs.forEach(log => {
+        const pt = map.latLngToContainerPoint(L.latLng(log.coords[0], log.coords[1]));
+        const radiusPx = Math.abs(pt.y - map.latLngToContainerPoint(
+            L.latLng(log.coords[0] + (exploreRadiusValue / 111000), log.coords[1])
+        ).y);
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, radiusPx, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Apply mask
+    const dataUrl = maskCanvas.toDataURL();
+    const backdrop = document.getElementById('fog-backdrop');
+    backdrop.style.maskImage = `url(${dataUrl})`;
+    backdrop.style.maskMode = 'luminance';
+    backdrop.style.maskRepeat = 'no-repeat';
+    backdrop.style.maskSize = '100% 100%';
+    backdrop.style.webkitMaskImage = `url(${dataUrl})`;
+    backdrop.style.webkitMaskMode = 'luminance';
+    backdrop.style.webkitMaskRepeat = 'no-repeat';
+    backdrop.style.webkitMaskSize = '100% 100%';
+}
+
+function clearFog() {
+    document.getElementById('fog-layer').classList.remove('visible');
+}
+
+// =====================================================================
+// EXPLORED AREA (Canvas — kein Farbton-Shift bei Überlappungen)
+// =====================================================================
+function drawExploredArea() {
+    const canvas = document.getElementById('explored-canvas');
+    const container = document.getElementById('map-container');
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+    if (!w || !h) return;
+
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+
+    const filtered = getFilteredLogs();
+    if (!filtered.length || !document.getElementById('exploreModeToggle').checked) {
+        canvas.style.display = 'none';
+        return;
+    }
+
+    canvas.style.display = 'block';
+
+    // Nur UNIQUE locations
+    const seen = new Set();
+    const unique = filtered.filter(l => {
+        const key = l.coords[0].toFixed(5) + ',' + l.coords[1].toFixed(5);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    // Offscreen-Buffer: Alle Kreise deckend zeichnen → Überlappungen ändern Farbton nicht
+    const memCanvas = document.createElement('canvas');
+    memCanvas.width = w;
+    memCanvas.height = h;
+    const memCtx = memCanvas.getContext('2d');
+    memCtx.fillStyle = 'rgba(16, 185, 129, 1)';
+
+    unique.forEach(log => {
+        const pt = map.latLngToContainerPoint(L.latLng(log.coords[0], log.coords[1]));
+        const radiusPx = Math.abs(pt.y - map.latLngToContainerPoint(
+            L.latLng(log.coords[0] + (exploreRadiusValue / 111000), log.coords[1])
+        ).y);
+
+        memCtx.beginPath();
+        memCtx.arc(pt.x, pt.y, radiusPx, 0, Math.PI * 2);
+        memCtx.fill();
+    });
+
+    ctx.drawImage(memCanvas, 0, 0);
+    canvas.style.opacity = '0.55';
+}
+
+// =====================================================================
+// GLOW POINTS (Mehrfachbesuche)
+// =====================================================================
+function updateGlowPoints() {
+    const container = document.getElementById('glow-points');
+    container.innerHTML = '';
+
+    const filtered = getFilteredLogs();
+    const countMap = new Map();
+    filtered.forEach(log => {
+        const key = log.coords[0].toFixed(4) + ',' + log.coords[1].toFixed(4);
+        if (!countMap.has(key)) countMap.set(key, { coords: log.coords, count: 0 });
+        countMap.get(key).count++;
+    });
+
+    countMap.forEach((data) => {
+        if (data.count < 2) return;
+        const pt = map.latLngToContainerPoint(L.latLng(data.coords[0], data.coords[1]));
+        const intensity = Math.min(1, (data.count - 1) / 10);
+        const size = 8 + intensity * 16;
+        const el = document.createElement('div');
+        el.className = 'glow-point';
+        el.style.left = pt.x + 'px';
+        el.style.top = pt.y + 'px';
+        el.style.width = size + 'px';
+        el.style.height = size + 'px';
+        el.style.opacity = 0.3 + intensity * 0.5;
+        el.style.background = `rgba(99,102,241,${0.3 + intensity * 0.5})`;
+        el.style.boxShadow = `0 0 ${10 + intensity * 20}px ${5 + intensity * 10}px rgba(99,102,241,${0.2 + intensity * 0.3})`;
+        container.appendChild(el);
+    });
+}
+
+// =====================================================================
+// MAIN DISPLAY
+// =====================================================================
+function updateDisplay() {
+    overlayGroup.clearLayers();
+    clearFog();
+    clearHighlights();
+    districtLayers.forEach(l => map.removeLayer(l));
+    districtLayers = [];
+    countryLayers.forEach(l => map.removeLayer(l));
+    countryLayers = [];
+
+    const filtered = getFilteredLogs();
+    document.getElementById('stats-count').textContent = filtered.length;
+
+    // Unique Locations (dedupliziert nach Adresse)
+    const uniqueAddresses = new Set(filtered.map(l => l.address)).size;
+    document.getElementById('stats-unique').textContent = uniqueAddresses;
+
+    // Freigeschaltete Stadtteile zählen
+    const visitedDistricts = findDistrictsForLogs(parsedLogs);
+    document.getElementById('stats-unlocked').textContent = visitedDistricts.size;
+
+    if (!filtered.length) {
+        drawExploredArea();
+        updateGlowPoints();
+    // 6. LÄNDER-MODUS
+    if (document.getElementById('countryModeToggle').checked) {
+        drawCountryOverlay();
+    }
+
+    updateInspector();
+        return;
+    }
+
+    const mapMode = document.getElementById('mapModeSelect').value;
+    const strokeColor = (mapMode === 'dark' || mapMode === 'satellite') ? '#ffffff' : '#000000';
+
+    // 1. Explored area (Canvas — merged circles)
+    drawExploredArea();
+
+    // 2. Fog of War
+    if (document.getElementById('fogToggle').checked) {
+        drawFog(filtered);
+    } else {
+        clearFog();
+    }
+
+    // 3. YOUR WAY PFAD
+    if (document.getElementById('yourWayToggle').checked && filtered.length > 1) {
+        for (let i = 0; i < filtered.length - 1; i++) {
+            const p1 = filtered[i], p2 = filtered[i+1];
+            const h = Math.abs(p2.timestamp - p1.timestamp) / 3600000;
+            const v = h > 0 ? (calcDistance(p1.coords, p2.coords) / h) : 0;
+            L.polyline([p1.coords, p2.coords], {
+                color: v > 25 ? '#ef4444' : '#6366f1',
+                weight: v > 25 ? 4 : 2,
+                opacity: 0.85
+            }).addTo(overlayGroup);
+        }
+    }
+
+    // 4. HOTSPOT PUNKTE
+        const locationData = {};
+
+        filtered.forEach((log, i) => {
+            if (!locationData[log.address]) {
+                locationData[log.address] = { coords: log.coords, count: 0, visits: [] };
+            }
+            locationData[log.address].count++;
+            const w = log.weather || { condition: 'Unbekannt', text: '—' };
+            locationData[log.address].visits.push({
+                date: log.dateString,
+                time: log.timeString,
+                weather: w.text || '—',
+                condition: w.condition || '—',
+                timestamp: log.timestamp
+            });
+        });
+
         const bounds = [];
 
-        allPoints.forEach(point => {
-            if (point.lat && point.lon) {
-                const position = [point.lat, point.lon];
-                bounds.push(position);
+        Object.keys(locationData).forEach(address => {
+            const data = locationData[address];
+            const r = 15 + data.count * 6;
+            const shortAddr = address.split('\n')[0];
+            // Chronologisch sortiert – letzter Besuch zuerst
+            const sortedVisits = [...data.visits].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const lastVisit = sortedVisits[0];
+            const isHighlighted = selectedDistrict && data.coords && isPointInSelectedDistrict(data.coords);
+            const wIcon = lastVisit.condition === 'Regen' ? '🌧️' : lastVisit.condition === 'Sonne' ? '☀️' : '🌤️';
 
-                const marker = L.circleMarker(position, { radius: 4, color: 'var(--primary)', fillColor: 'var(--primary)', fillOpacity: 1 });
-                marker.bindPopup(`<strong>Zeitpunkt:</strong> ${point.timestamp}<br><strong>Ort:</strong> ${point.address}`);
+        const opacity = Math.min(0.9, 0.4 + data.count * 0.08);
 
-                const zoneCircle = L.circle(position, {
-                    radius: 1000, color: 'var(--primary)', weight: 1, fillColor: 'var(--primary-light)', fillOpacity: 0.25
-                });
+        const circle = L.circle(data.coords, {
+            color: strokeColor,
+            fillColor: isHighlighted ? '#818cf8' : '#6366f1',
+            fillOpacity: isHighlighted ? 0.85 : opacity,
+            radius: isHighlighted ? r * 1.3 : r,
+            weight: isHighlighted ? 2.5 : 1.5,
+            className: isHighlighted ? 'district-highlight' : '',
+        }).addTo(overlayGroup);
 
-                zoneCircle.addTo(trackerLayer);
-                marker.addTo(trackerLayer);
-            }
+        // Klick öffnet rechtes Panel statt Leaflet-Popup
+        circle.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            openDetailPanel(address, shortAddr, sortedVisits, data.count);
         });
 
-        if (bounds.length > 0) { map.fitBounds(bounds); }
+        bounds.push(data.coords);
+    });
+
+    // 5. Glow points for multi-visit
+    updateGlowPoints();
+
+    if (bounds.length && !selectedDistrict) {
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
 
-    // 7. INTELLIGENTER PLZ-FIRST CSV PARSER & UPLOAD
-    document.getElementById('fileInput').addEventListener('change', function(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+    // 6. LÄNDER-MODUS (auch wenn Filter-Logs existieren)
+    if (document.getElementById('countryModeToggle').checked) {
+        drawCountryOverlay();
+    }
 
-        const reader = new FileReader();
-        const statusLog = document.getElementById('statusLog');
-        const closeBtn = document.getElementById('closeModalBtn');
-        
-        statusLog.style.display = 'block';
-        isUploading = true;
-        closeBtn.style.display = 'none'; // Verstecke Schließen während des Prozesses
+    updateInspector();
+    updateDataStatus();
 
-        reader.onload = async function(e) {
-            const lines = e.target.result.split('\n');
-            const validEntries = [];
-            statusLog.innerHTML = 'Verarbeite CSV...<br>';
+    // invalidateSize sicherstellen
+    requestAnimationFrame(() => { map.invalidateSize(true); });
+}
 
-            let currentTimestamp = "";
-            let currentLines = [];
+// =====================================================================
+// OVERPASS DISTRICT LOADING — POST + CORS-Proxy Fallback
+// =====================================================================
+let overpassDistrictsCache = null;
 
-            // Zeilenblöcke gruppieren
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
+function extractPolygonFromElement(el) {
+    if (el.geometry && el.geometry.length >= 4) {
+        return el.geometry.map(g => [g.lat, g.lon]);
+    }
+    if (el.members) {
+        const outerWays = el.members.filter(m => m.role === 'outer' && m.geometry);
+        if (outerWays.length > 0) {
+            const coords = [];
+            outerWays.forEach(w => { w.geometry.forEach(g => coords.push([g.lat, g.lon])); });
+            if (coords.length >= 4) return coords;
+        }
+    }
+    return null;
+}
 
-                if (line.includes(';')) {
-                    if (currentTimestamp && currentLines.length > 0) {
-                        validEntries.push({ timestamp: currentTimestamp, rawLines: [...currentLines] });
-                    }
-                    const parts = line.split(';');
-                    currentTimestamp = parts[0].trim();
-                    currentLines = [parts.slice(1).join(' ').trim()];
-                } else {
-                    if (currentTimestamp) currentLines.push(line);
-                }
-            }
-            if (currentTimestamp && currentLines.length > 0) {
-                validEntries.push({ timestamp: currentTimestamp, rawLines: currentLines });
-            }
+async function fetchOverpass(query) {
+    const overpassBase = 'https://overpass-api.de/api/interpreter';
+    // Versuch 1: Direkter POST (Content-Type text/plain vermeidet preflight)
+    try {
+        const r = await fetch(overpassBase, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: query,
+        });
+        if (r.ok) return await r.json();
+    } catch(e) {}
+    // Versuch 2: corsproxy.io
+    try {
+        const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(overpassBase)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: query,
+        });
+        if (r.ok) return await r.json();
+    } catch(e) {}
+    // Versuch 3: allorigins GET-Fallback
+    try {
+        const getUrl = overpassBase + '?data=' + encodeURIComponent(query);
+        const r = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(getUrl));
+        if (r.ok) {
+            const wrapper = await r.json();
+            if (wrapper.contents) return JSON.parse(wrapper.contents);
+        }
+    } catch(e) {}
+    return null;
+}
 
-            // Intelligente Adress-Zusammensetzung (PLZ suchen)
-            const parsedPlaces = [];
-            validEntries.forEach(entry => {
-                let plzLineIndex = -1;
-                let streetLineIndex = -1;
+function loadOverpassDistricts(force) {
+    if (overpassDistrictsCache && !force) return;
+    const cached = localStorage.getItem('overpass_districts_v3');
+    if (cached && !force) {
+        try { overpassDistrictsCache = JSON.parse(cached); } catch(e) {}
+        if (overpassDistrictsCache) return;
+    }
 
-                // RegExp für 5-stellige deutsche Postleitzahl
-                const plzRegex = /\b\d{5}\b/;
-
-                entry.rawLines.forEach((l, idx) => {
-                    if (plzRegex.test(l)) {
-                        plzLineIndex = idx;
-                    } else if (l.toLowerCase() !== "deutschland" && streetLineIndex === -1) {
-                        streetLineIndex = idx;
-                    }
-                });
-
-                let cleanAddress = "";
-                if (plzLineIndex !== -1 && streetLineIndex !== -1 && plzLineIndex !== streetLineIndex) {
-                    // Konstruiere: "Straße Hausnummer, PLZ Ort, Deutschland"
-                    cleanAddress = `${entry.rawLines[streetLineIndex]}, ${entry.rawLines[plzLineIndex]}, Deutschland`;
-                } else {
-                    // Fallback, falls die Struktur abweicht
-                    cleanAddress = entry.rawLines.join(', ');
-                }
-
-                parsedPlaces.push({ timestamp: entry.timestamp, address: cleanAddress });
-            });
-
-            statusLog.innerHTML += `${parsedPlaces.length} Orte analysiert. Starte API-Suche...<br>`;
-            
-            const resolvedPoints = [];
-            for (let entry of parsedPlaces) {
-                statusLog.innerHTML += `Suche: ${entry.address.split(',')[0]}...<br>`;
-                statusLog.scrollTop = statusLog.scrollHeight;
-                
-                const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(entry.address)}&format=json&limit=1`;
-                try {
-                    const res = await fetch(url, { headers: { 'User-Agent': 'GeoDashboard/1.0' } });
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                        resolvedPoints.push({
-                            lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon),
-                            timestamp: entry.timestamp, address: entry.address
-                        });
-                    }
-                    await new Promise(r => setTimeout(r, 450)); 
-                } catch(err) { console.error(err); }
-            }
-
-            localStorage.setItem("tracked_places", JSON.stringify(resolvedPoints));
-            statusLog.innerHTML += '<br><strong style="color:var(--primary)">✔ Hinzufügen abgeschlossen!</strong>';
-            
-            // Upload beendet -> Schließen wieder erlauben
-            isUploading = false;
-            closeBtn.style.display = 'block';
-            
-            loadDataFromStorage();
-        };
-        reader.readAsText(file);
-    });
-
-    // Daten löschen
-    document.getElementById('clearStorageBtn').addEventListener('click', () => {
-        if (confirm("Möchtest du wirklich alle aufgezeichneten Orte unwiderruflich löschen?")) {
-            localStorage.removeItem("tracked_places");
-            allPoints = [];
-            if(trackerLayer) trackerLayer.clearLayers();
-            document.getElementById('statusLog').style.display = 'none';
-            calculateCounters();
-            renderDashboardList();
-            alert("Daten gelöscht.");
+    const cities = new Map();
+    parsedLogs.forEach(l => {
+        const d = findDistrict(l.coords);
+        if (d && !cities.has(d.city)) {
+            const center = d.polygon.reduce((a, b) => [a[0]+b[0], a[1]+b[1]], [0,0]).map(v => v / d.polygon.length);
+            cities.set(d.city, center);
         }
     });
+
+    if (!cities.size) return;
+    overpassDistrictsCache = overpassDistrictsCache || {};
+
+    let idx = 0;
+    const entries = Array.from(cities.entries());
+
+    async function queryNext() {
+        if (idx >= entries.length) {
+            try { localStorage.setItem('overpass_districts_v3', JSON.stringify(overpassDistrictsCache)); } catch(e) {}
+            if (currentTab === 'karte') updateDisplay();
+            return;
+        }
+        const [city, center] = entries[idx++];
+        const query = `[out:json][timeout:25];(relation["admin_level"~"^(9|10)$"](around:8000,${center[0]},${center[1]}););out geom;`;
+        try {
+            const data = await fetchOverpass(query);
+            if (data && data.elements && data.elements.length) {
+                const districts = [];
+                data.elements.forEach(el => {
+                    const name = el.tags && (el.tags.name || el.tags['name:de'] || '');
+                    if (!name) return;
+                    const polygon = extractPolygonFromElement(el);
+                    if (!polygon || polygon.length < 4) return;
+                    districts.push({ city, name, polygon, source: 'overpass' });
+                });
+                if (districts.length) {
+                    overpassDistrictsCache[city] = districts;
+                    showToast(`📍 Echte Grenzen für ${city} geladen`);
+                }
+            }
+        } catch(e) { /* lautlos scheitern, Vierecke bleiben */ }
+        setTimeout(queryNext, 2500);
+    }
+    queryNext();
+}
+
+function reloadRealBorders() {
+    localStorage.removeItem('overpass_districts_v3');
+    overpassDistrictsCache = null;
+    loadOverpassDistricts(true);
+    showToast('🔄 Lade echte Grenzen...');
+}
+
+// =====================================================================
+// DISTRICT OVERLAYS mit Turf.js Union-Bereinigung
+// =====================================================================
+function drawDistrictOverlays() {
+    const countryMode = document.getElementById('countryModeToggle').checked;
+    const visited = findDistrictsForLogs(parsedLogs);
+
+    // Starte Overpass-Ladung falls nötig (async, cached)
+    loadOverpassDistricts();
+
+    // Baue Lookup für Overpass-Daten
+    const opLookup = {};
+    if (overpassDistrictsCache) {
+        for (const [city, districts] of Object.entries(overpassDistrictsCache)) {
+            districts.forEach(d => { opLookup[city + ':' + d.name] = d; });
+        }
+    }
+
+    // Sammle alle besuchten Polygone für Union-Berechnung
+    const visitedPolygonFeatures = [];
+
+    GERMAN_DISTRICTS.forEach(d => {
+        const key = d.city + ':' + d.name;
+        const isVisited = visited.has(key);
+        if (!isVisited) return;
+
+        const districtPoints = visited.get(key).points || [];
+        const fillOpacity = countryMode ? 0.03 : 0.12;
+        const weight = countryMode ? 0.5 : 1.5;
+        const color = countryMode ? 'rgba(99,102,241,0.3)' : '#6366f1';
+
+        // Bevorzuge Overpass-Polygon (echte Grenzen), Fallback auf Viereck
+        const opData = opLookup[key];
+        const polyCoords = opData ? opData.polygon : d.polygon;
+
+        // Für Turf.js Union: [lon, lat] statt [lat, lon]
+        try {
+            if (typeof turf !== 'undefined') {
+                const turfCoords = polyCoords.map(c => [c[1], c[0]]);
+                // Schließe Polygon
+                if (turfCoords[0][0] !== turfCoords[turfCoords.length-1][0] ||
+                    turfCoords[0][1] !== turfCoords[turfCoords.length-1][1]) {
+                    turfCoords.push(turfCoords[0]);
+                }
+                if (turfCoords.length >= 4) {
+                    visitedPolygonFeatures.push(turf.polygon([turfCoords], { key, districtPoints, d }));
+                }
+            }
+        } catch(e) {}
+
+        const polygon = L.polygon(polyCoords, {
+            color,
+            weight,
+            fillColor: '#6366f1',
+            fillOpacity,
+            interactive: true,
+        }).addTo(map);
+
+        polygon.on('click', () => {
+            highlightDistrictPoints(d, districtPoints);
+        });
+
+        polygon.bindPopup(`
+            <div class="text-xs p-1" style="min-width:140px">
+                <strong class="text-indigo-500">${d.name}</strong>
+                <div class="text-[10px]" style="color:var(--text-muted)">${d.city}${opData ? ' · echte Grenzen' : ''}</div>
+                <div class="text-[10px] mt-1">📍 ${districtPoints.length} Punkt${districtPoints.length !== 1 ? 'e' : ''} (Unique: ${new Set(districtPoints.map(p=>p.address)).size})</div>
+            </div>
+        `);
+
+        districtLayers.push(polygon);
+    });
+
+    // Turf Union: Überlappende besuchte Zonen zusammenführen & als Highlight-Outline anzeigen
+    if (typeof turf !== 'undefined' && visitedPolygonFeatures.length > 1) {
+        try {
+            let unionResult = visitedPolygonFeatures[0];
+            for (let i = 1; i < visitedPolygonFeatures.length; i++) {
+                try { unionResult = turf.union(unionResult, visitedPolygonFeatures[i]); } catch(e) {}
+            }
+            if (unionResult) {
+                const leafletUnion = L.geoJSON(unionResult, {
+                    style: { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.04, dashArray: '4 4' },
+                    interactive: false,
+                }).addTo(map);
+                districtLayers.push(leafletUnion);
+            }
+        } catch(e) {}
+    }
+}
+
+function isPointInSelectedDistrict(coords) {
+    if (!selectedDistrict || !coords) return false;
+    return pointInPolygon(coords[0], coords[1], selectedDistrict.polygon);
+}
+
+function highlightDistrictPoints(district, points) {
+    selectedDistrict = district;
+    showToast(`📍 ${district.name} (${district.city}) — ${points.length} Punkte`);
+    updateDisplay();
+
+    if (points.length) {
+        const coords = points.map(p => p.coords);
+        const group = L.featureGroup(coords.map(c => L.marker(c)));
+        map.fitBounds(group.getBounds().pad(0.3), { maxZoom: 15 });
+    }
+}
+
+function clearHighlights() {
+    selectedDistrict = null;
+}
+
+// Deutsche → Englische Ländernamen für GeoJSON-Matching
+const COUNTRY_EN = {
+    'Ägypten':'Egypt','Äquatorialguinea':'Equatorial Guinea','Äthiopien':'Ethiopia','Afghanistan':'Afghanistan',
+    'Albanien':'Albania','Algerien':'Algeria','Andorra':'Andorra','Angola':'Angola','Argentinien':'Argentina',
+    'Armenien':'Armenia','Aserbaidschan':'Azerbaijan','Australien':'Australia','Bahamas':'Bahamas','Bahrain':'Bahrain',
+    'Bangladesch':'Bangladesh','Barbados':'Barbados','Belarus':'Belarus','Belgien':'Belgium','Belize':'Belize',
+    'Benin':'Benin','Bhutan':'Bhutan','Bolivien':'Bolivia','Bosnien und Herzegowina':'Bosnia and Herzegovina',
+    'Botswana':'Botswana','Brasilien':'Brazil','Brunei':'Brunei','Bulgarien':'Bulgaria','Burkina Faso':'Burkina Faso',
+    'Burundi':'Burundi','Chile':'Chile','China':'China','Costa Rica':'Costa Rica','Dänemark':'Denmark',
+    'Deutschland':'Germany','Dominica':'Dominica','Dominikanische Republik':'Dominican Republic','Dschibuti':'Djibouti',
+    'Ecuador':'Ecuador','El Salvador':'El Salvador','Elfenbeinküste':'Ivory Coast','Eritrea':'Eritrea','Estland':'Estonia',
+    'Eswatini':'Eswatini','Fidschi':'Fiji','Finnland':'Finland','Frankreich':'France','Gabun':'Gabon','Gambia':'Gambia',
+    'Georgien':'Georgia','Ghana':'Ghana','Grenada':'Grenada','Griechenland':'Greece','Guatemala':'Guatemala',
+    'Guinea':'Guinea','Guinea-Bissau':'Guinea-Bissau','Guyana':'Guyana','Haiti':'Haiti','Honduras':'Honduras',
+    'Indien':'India','Indonesien':'Indonesia','Irak':'Iraq','Iran':'Iran','Irland':'Ireland','Island':'Iceland',
+    'Israel':'Israel','Italien':'Italy','Jamaika':'Jamaica','Japan':'Japan','Jemen':'Yemen','Jordanien':'Jordan',
+    'Kambodscha':'Cambodia','Kamerun':'Cameroon','Kanada':'Canada','Kap Verde':'Cape Verde','Kasachstan':'Kazakhstan',
+    'Katar':'Qatar','Kenia':'Kenya','Kirgisistan':'Kyrgyzstan','Kiribati':'Kiribati','Kolumbien':'Colombia',
+    'Komoren':'Comoros','Kongo (Dem. Rep.)':'Democratic Republic of the Congo','Kongo (Rep.)':'Republic of the Congo',
+    'Kroatien':'Croatia','Kuba':'Cuba','Kuwait':'Kuwait','Laos':'Laos','Lesotho':'Lesotho','Lettland':'Latvia',
+    'Libanon':'Lebanon','Liberia':'Liberia','Libyen':'Libya','Liechtenstein':'Liechtenstein','Litauen':'Lithuania',
+    'Luxemburg':'Luxembourg','Madagaskar':'Madagascar','Malawi':'Malawi','Malaysia':'Malaysia','Malediven':'Maldives',
+    'Mali':'Mali','Malta':'Malta','Marokko':'Morocco','Marshallinseln':'Marshall Islands','Mauretanien':'Mauritania',
+    'Mauritius':'Mauritius','Mexiko':'Mexico','Mikronesien':'Micronesia','Moldau':'Moldova','Monaco':'Monaco',
+    'Mongolei':'Mongolia','Montenegro':'Montenegro','Mosambik':'Mozambique','Myanmar':'Myanmar','Namibia':'Namibia',
+    'Nauru':'Nauru','Nepal':'Nepal','Neuseeland':'New Zealand','Nicaragua':'Nicaragua','Niederlande':'Netherlands',
+    'Niger':'Niger','Nigeria':'Nigeria','Nordkorea':'North Korea','Nordmazedonien':'North Macedonia','Norwegen':'Norway',
+    'Oman':'Oman','Österreich':'Austria','Osttimor':'East Timor','Pakistan':'Pakistan','Palau':'Palau',
+    'Palästina':'Palestine','Panama':'Panama','Papua-Neuguinea':'Papua New Guinea','Paraguay':'Paraguay','Peru':'Peru',
+    'Philippinen':'Philippines','Polen':'Poland','Portugal':'Portugal','Ruanda':'Rwanda','Rumänien':'Romania',
+    'Russland':'Russia','Salomonen':'Solomon Islands','Sambia':'Zambia','Samoa':'Samoa','San Marino':'San Marino',
+    'São Tomé und Príncipe':'São Tomé and Príncipe','Saudi-Arabien':'Saudi Arabia','Schweden':'Sweden','Schweiz':'Switzerland',
+    'Senegal':'Senegal','Serbien':'Serbia','Seychellen':'Seychelles','Sierra Leone':'Sierra Leone','Simbabwe':'Zimbabwe',
+    'Singapur':'Singapore','Slowakei':'Slovakia','Slowenien':'Slovenia','Somalia':'Somalia','Spanien':'Spain',
+    'Sri Lanka':'Sri Lanka','St. Kitts und Nevis':'Saint Kitts and Nevis','St. Lucia':'Saint Lucia',
+    'St. Vincent und die Grenadinen':'Saint Vincent and the Grenadines','Sudan':'Sudan','Südafrika':'South Africa',
+    'Südkorea':'South Korea','Südsudan':'South Sudan','Suriname':'Suriname','Syrien':'Syria','Tadschikistan':'Tajikistan',
+    'Tansania':'Tanzania','Thailand':'Thailand','Togo':'Togo','Tonga':'Tonga','Trinidad und Tobago':'Trinidad and Tobago',
+    'Tschad':'Chad','Tschechien':'Czech Republic','Tunesien':'Tunisia','Türkei':'Turkey','Turkmenistan':'Turkmenistan',
+    'Tuvalu':'Tuvalu','Uganda':'Uganda','Ukraine':'Ukraine','Ungarn':'Hungary','Uruguay':'Uruguay',
+    'Usbekistan':'Uzbekistan','Vanuatu':'Vanuatu','Vatikanstadt':'Vatican City','Venezuela':'Venezuela',
+    'Vereinigte Arabische Emirate':'United Arab Emirates','Vereinigte Staaten':'United States',
+    'Vereinigtes Königreich':'United Kingdom','Vietnam':'Vietnam','Zentralafrikanische Republik':'Central African Republic',
+    'Zypern':'Cyprus',
+};
+
+function getENName(deName) {
+    return COUNTRY_EN[deName] || deName;
+}
+
+// =====================================================================
+// COUNTRY OVERLAY (Länder-Modus)
+// =====================================================================
+function drawCountryOverlay() {
+    if (worldGeoJSON && worldGeoJSON.features) {
+        worldGeoJSON.features.forEach(f => {
+            const name = f.properties.name || f.properties.NAME || f.properties.NAME_LONG || '';
+            if (!name) return;
+            // Prüfe ob DE oder EN-Name in visitedCountries
+            const isVisited = visitedCountries.has(name) || visitedCountries.has(getDEFromEN(name));
+            const fillCol = isVisited ? 'rgba(16, 185, 129, 0.35)' : 'rgba(100, 116, 139, 0.03)';
+            const strokeCol = isVisited ? '#10b981' : 'rgba(100, 116, 139, 0.15)';
+
+            const layer = L.geoJSON(f, {
+                style: { color: strokeCol, weight: isVisited ? 1.5 : 0.5, fillColor: fillCol, fillOpacity: isVisited ? 0.4 : 0.03 },
+                interactive: true,
+            }).addTo(map);
+
+            layer.bindPopup(`
+                <div class="text-xs p-1">
+                    <strong>${name}</strong>
+                    <div class="text-[10px]" style="color:var(--text-muted)">${isVisited ? '✅ Besucht' : '❌ Nicht besucht'}</div>
+                </div>
+            `);
+
+            countryLayers.push(layer);
+        });
+    } else if (typeof topojson !== 'undefined') {
+        showToast('🌍 Lade Weltkarte...');
+        loadWorldGeoJSON();
+    }
+
+    loadCountryUI();
+}
+
+function getDEFromEN(enName) {
+    for (const [de, en] of Object.entries(COUNTRY_EN)) {
+        if (en === enName) return de;
+    }
+    return enName;
+}
+
+// =====================================================================
+// DETAIL PANEL (rechts auf Karte)
+// =====================================================================
+function wIconFor(condition) {
+    return condition === 'Regen' ? '🌧️' : condition === 'Sonne' ? '☀️' : '🌤️';
+}
+
+function openDetailPanel(address, shortAddr, sortedVisits, count) {
+    const panel = document.getElementById('detail-panel');
+    document.getElementById('detail-title').textContent = shortAddr || address;
+
+    const latest = sortedVisits[0];
+    const icon = latest.condition === 'Sonne' ? '☀️' : '🌧️';
+
+    document.getElementById('detail-last').innerHTML = `
+        <div id="detail-last-icon">${icon}</div>
+        <div id="detail-last-meta">
+            <span id="detail-last-date">${latest.date} · ${latest.time} Uhr</span>
+            <span id="detail-last-weather">${latest.weather}</span>
+        </div>
+    `;
+
+    const listContainer = document.getElementById('detail-list');
+    listContainer.innerHTML = '';
+
+    sortedVisits.forEach(v => {
+        const rowIcon = v.condition === 'Sonne' ? '☀️' : '🌧️';
+        const row = document.createElement('div');
+        row.className = 'dp-row';
+        row.innerHTML = `
+            <span class="dp-row-icon">${rowIcon}</span>
+            <span>${v.date} · ${v.time}</span>
+            <span class="dp-row-meta">${v.condition}</span>
+        `;
+        listContainer.appendChild(row);
+    });
+
+    panel.classList.add('open');
+}
+
+function closeDetailPanel() {
+    document.getElementById('detail-panel').classList.remove('open');
+}
+
+// Klick auf Karte (nicht auf Marker) schließt Panel
+
+// =====================================================================
+// EXPORT
+// =====================================================================
+function exportFullBackup() {
+    const data = localStorage.getItem('fog_of_war_data_v6');
+    if (!data || data === '{}') { showToast('Keine Daten zum Exportieren'); return; }
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'exploreyourway_backup.json'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('✅ Komplett-Backup exportiert');
+}
+
+function importFullBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!confirm('Backup importieren? Alle aktuellen Daten werden überschrieben.')) { event.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.logs) { showToast('❌ Ungültige Backup-Datei'); return; }
+            localStorage.setItem('fog_of_war_data_v6', JSON.stringify(data));
+            location.reload();
+        } catch(err) { showToast('❌ Fehler beim Import: ' + err.message); }
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
+function exportData(format) {
+    if (!parsedLogs.length) { showToast('Keine Daten zum Exportieren'); return; }
+    let content, mime, filename;
+
+    if (format === 'json') {
+        content = JSON.stringify(parsedLogs.map(l => ({
+            timestamp: l.timestamp.toISOString(),
+            date: l.dateString,
+            time: l.timeString,
+            address: l.address,
+            lat: l.coords ? l.coords[0] : null,
+            lon: l.coords ? l.coords[1] : null,
+            weather: l.weather ? l.weather.text : null,
+            weatherCondition: l.weather ? l.weather.condition : null,
+        })), null, 2);
+        mime = 'application/json';
+        filename = 'exploreyourway_export.json';
+    } else if (format === 'csv') {
+        const rows = [['Datum','Uhrzeit','Adresse','Lat','Lon','Wetter','Wettertyp']];
+        parsedLogs.forEach(l => {
+            rows.push([
+                l.dateString || '',
+                l.timeString || '',
+                (l.address || '').replace(/\n/g,' ').replace(/,/g,' '),
+                l.coords ? l.coords[0] : '',
+                l.coords ? l.coords[1] : '',
+                l.weather ? (l.weather.text || '').replace(/,/g,' ') : '',
+                l.weather ? l.weather.condition : '',
+            ]);
+        });
+        content = rows.map(r => r.join(',')).join('\n');
+        mime = 'text/csv';
+        filename = 'exploreyourway_export.csv';
+    } else if (format === 'geojson') {
+        const features = parsedLogs.filter(l => l.coords).map(l => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [l.coords[1], l.coords[0]] },
+            properties: {
+                timestamp: l.timestamp.toISOString(),
+                address: l.address,
+                weather: l.weather ? l.weather.text : null,
+            }
+        }));
+        content = JSON.stringify({ type: 'FeatureCollection', features }, null, 2);
+        mime = 'application/geo+json';
+        filename = 'exploreyourway_export.geojson';
+    }
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    showToast(`✅ ${filename} exportiert`);
+}
+
+// =====================================================================
+// VISIT POPUP (Legacy — wird für Region-Clicks noch genutzt)
+// =====================================================================
+function openVisitPopup(encodedAddress, visitsJson) {
+    const address = decodeURIComponent(encodedAddress);
+    const visits = typeof visitsJson === 'string' ? JSON.parse(visitsJson.replace(/&quot;/g, '"')) : visitsJson;
+    const shortAddr = address.split('\n')[0];
+    const sortedVisits = visits.sort ? visits : [...visits].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+    openDetailPanel(address, shortAddr, sortedVisits, sortedVisits.length);
+}
+
+function closeVisitPopup(e) {
+    if (e.target.id === 'visit-popup-overlay') {
+        document.getElementById('visit-popup-overlay').classList.remove('open');
+    }
+}
+
+// =====================================================================
+// EXPLORE TAB — KEIN LEVEL/XP MEHR!
+// =====================================================================
+function updateExploreTab() {
+    const area = calcExploreArea(parsedLogs);
+    const uniquePlaces = new Set(parsedLogs.map(l => l.address).filter(Boolean)).size;
+    const activeDays = new Set(parsedLogs.map(l => l.timestamp.toDateString())).size;
+
+    document.getElementById('explore-area').textContent = area + ' km²';
+    document.getElementById('explore-unique').textContent = uniquePlaces;
+    document.getElementById('explore-days').textContent = activeDays;
+
+    // Achievements
+    const state = { logs: parsedLogs, importCount, visitedCountries };
+    const unlocked = ACHIEVEMENTS.filter(a => a.check(state));
+    document.getElementById('achv-count').textContent = `(${unlocked.length}/${ACHIEVEMENTS.length})`;
+
+    const list = document.getElementById('achievement-list');
+    list.innerHTML = ACHIEVEMENTS.map(a => {
+        const isUnlocked = a.check(state);
+        return `<div class="flex items-center gap-2 p-2 rounded-lg border ${isUnlocked ? '' : 'opacity-40'}" style="background:var(--bg-card);border-color:var(--border-color)">
+            <span class="text-xl">${a.icon}</span>
+            <div>
+                <div class="text-xs font-bold">${a.title}</div>
+                <div class="text-[10px]" style="color:var(--text-muted)">${a.desc}</div>
+            </div>
+            ${isUnlocked ? '<span class="ml-auto text-green-500 text-xs">✓</span>' : '<span class="ml-auto text-[10px]" style="color:var(--text-muted)">🔒</span>'}
+        </div>`;
+    }).join('');
+
+    requestAnimationFrame(() => { map.invalidateSize(true); });
+}
+
+// =====================================================================
+// DATA INSPECTOR (in Einstellungen)
+// =====================================================================
+function updateInspector() {
+    const tbody = document.getElementById('inspector-tbody');
+    const count = document.getElementById('inspector-count');
+    count.textContent = parsedLogs.length + ' Einträge';
+
+    if (!parsedLogs.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="p-2 text-center opacity-60">Keine Daten</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = parsedLogs.map((log, i) => {
+        const addr = log.address || '—';
+        const shortAddr = addr.split('\n')[0].substring(0, 25);
+        const hasCoords = log.coords ? '✅' : '❌';
+        return `<tr class="inspector-row" onclick="flyToPoint(${i})" style="border-bottom:1px solid var(--border-color);">
+            <td class="p-1 font-bold" style="color:var(--text-muted)">${i + 1}</td>
+            <td class="p-1 text-[9px]">${log.dateString || '—'}</td>
+            <td class="p-1 text-[9px] max-w-[120px] truncate">${shortAddr}</td>
+            <td class="p-1 text-[10px]">${hasCoords}</td>
+        </tr>`;
+    }).join('');
+}
+
+function flyToPoint(index) {
+    const log = parsedLogs[index];
+    if (!log || !log.coords) return;
+    switchTab('karte');
+    map.flyTo(log.coords, 16, { duration: 1.2 });
+    showToast(`📍 Springe zu: ${(log.address || '—').split('\n')[0]}`);
+}
+
+// =====================================================================
+// COUNTRY MANAGER (durchsuchbare Welt-Liste)
+// =====================================================================
+function loadCountryUI(filter) {
+    const list = document.getElementById('country-list');
+    const countEl = document.getElementById('country-count');
+    const searchVal = (filter || document.getElementById('country-search').value || '').toLowerCase();
+
+    const matching = WORLD_COUNTRIES.filter(c => c.name.toLowerCase().includes(searchVal));
+    countEl.textContent = `${visitedCountries.size}/${WORLD_COUNTRIES.length} besucht`;
+
+    if (!matching.length) {
+        list.innerHTML = '<div class="text-[10px] p-3 text-center opacity-60">Keine Länder gefunden</div>';
+        return;
+    }
+
+    list.innerHTML = matching.map(c => {
+        const isVisited = visitedCountries.has(c.name);
+        return `<div class="flex items-center gap-2 px-2 py-1.5 cursor-pointer text-xs border-b hover:opacity-80" 
+                    style="border-color:var(--border-color);background:${isVisited ? 'rgba(16,185,129,0.08)' : 'transparent'}"
+                    onclick="toggleCountry('${c.name}')">
+                    <span class="w-4 text-center">${isVisited ? '✅' : '⬜'}</span>
+                    <span class="${isVisited ? 'font-semibold text-green-500' : ''}">${c.name}</span>
+                </div>`;
+    }).join('');
+}
+
+function toggleCountry(name) {
+    const enName = getENName(name);
+    if (visitedCountries.has(name) || visitedCountries.has(enName)) {
+        visitedCountries.delete(name);
+        visitedCountries.delete(enName);
+    } else {
+        visitedCountries.add(name);
+        if (enName !== name) visitedCountries.add(enName);
+    }
+    loadCountryUI();
+    saveState();
+}
+
+function filterCountryList(value) {
+    loadCountryUI(value);
+}
+
+// =====================================================================
+// TIMEFRAME + FILTER
+// =====================================================================
+function changeTimeframe(timeframe) {
+    currentFilter = timeframe;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.style.background = 'var(--bg-card)';
+        btn.style.color = 'var(--text-main)';
+        btn.style.opacity = '0.6';
+    });
+    const btn = document.getElementById('btn-' + timeframe);
+    btn.style.background = '#0f172a';
+    btn.style.color = 'white';
+    btn.style.opacity = '1';
+    document.getElementById('date-picker-container').classList.toggle('hidden', timeframe !== 'datum');
+    updateDisplay();
+}
+
+function toggleLayer() {
+    saveState();
+    updateDisplay();
+    scheduleFogUpdate();
+}
+
+// =====================================================================
+// TOAST
+// =====================================================================
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._hide);
+    el._hide = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// =====================================================================
+// START
+// =====================================================================
 </script>
 </body>
 </html>
