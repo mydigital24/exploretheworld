@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standort Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        /* Schlichter Style für die Leaflet-Popups passend zum Design */
+        .leaflet-popup-content-wrapper {
+            background: #1f2937;
+            color: #f3f4f6;
+            border-radius: 0.5rem;
+        }
+        .leaflet-popup-tip {
+            background: #1f2937;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <aside class="w-full md:w-80 bg-white border-b md:border-b-0 md:border-r border-slate-200 p-6 flex flex-col gap-6 z-10 shadow-sm">
+        <div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">Meine Wege</h1>
+            <p class="text-xs text-slate-500 mt-1">Minimalistisches Standort-Tracking</p>
+        </div>
+
+        <nav class="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+            <button onclick="changeTimeframe('heute')" id="btn-heute" class="filter-btn flex-1 md:flex-initial text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-slate-900 text-white shadow-sm">Heute</button>
+            <button onclick="changeTimeframe('woche')" id="btn-woche" class="filter-btn flex-1 md:flex-initial text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-600 hover:bg-slate-100">Diese Woche</button>
+            <button onclick="changeTimeframe('monat')" id="btn-monat" class="filter-btn flex-1 md:flex-initial text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-600 hover:bg-slate-100">Diesen Monat</button>
+            <button onclick="changeTimeframe('jahr')" id="btn-jahr" class="filter-btn flex-1 md:flex-initial text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-600 hover:bg-slate-100">Dieses Jahr</button>
+            <button onclick="changeTimeframe('immer')" id="btn-immer" class="filter-btn flex-1 md:flex-initial text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-transparent text-slate-600 hover:bg-slate-100">Immer</button>
+        </nav>
+
+        <div class="mt-auto border-t border-slate-100 pt-4 hidden md:block">
+            <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Gefundene Besuche</div>
+            <div id="stats-count" class="text-3xl font-bold text-slate-900 mt-1">0</div>
+        </div>
+    </aside>
+
+    <main class="flex-1 relative h-full">
+        <div id="map" class="w-full h-full"></div>
+    </main>
+
+    <script>
+        // 1. DEINE CSV DATEN (Hier als String hinterlegt)
+        const csvData = `24.06.2026, 21:58;Uhlandstraße 7\n24116 Kiel\nDeutschland
+24.06.2026, 22:02;Uhlandstraße 7\n24116 Kiel\nDeutschland
+24.06.2026, 22:02;Uhlandstraße 7\n24116 Kiel\nDeutschland
+24.06.2026, 23:17;Uhlandstraße 7\n24116 Kiel\nDeutschland
+24.06.2026, 23:21;Uhlandstraße 7\n24116 Kiel\nDeutschland
+25.06.2026, 06:30;Uhlandstraße 7\n24116 Kiel\nDeutschland
+20.06.2026, 14:15;Exerzierplatz\n24103 Kiel\nDeutschland
+15.05.2026, 12:00;Hauptbahnhof\n24103 Kiel\nDeutschland`;
+
+        // 2. Geocoding Mock-Datenbank (Für eine echte App empfiehlt sich eine API wie Nominatim)
+        const geoCoordinates = {
+            "Uhlandstraße 7\n24116 Kiel\nDeutschland": [54.3252, 10.1165],
+            "Exerzierplatz\n24103 Kiel\nDeutschland": [54.3218, 10.1306],
+            "Hauptbahnhof\n24103 Kiel\nDeutschland": [54.3155, 10.1325]
+        };
+
+        let map, circleGroup;
+        let parsedLogs = [];
+        let currentFilter = 'heute';
+
+        // 3. CSV in nutzbare Objekte parsen
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const logs = [];
+            let currentLog = null;
+
+            lines.forEach(line => {
+                // Wenn die Zeile ein Semikolon enthält, beginnt ein neuer Eintrag
+                if (line.includes(';')) {
+                    if (currentLog) logs.push(currentLog);
+                    
+                    const [dateTimeStr, street] = line.split(';');
+                    const [dateStr, timeStr] = dateTimeStr.split(', ');
+                    const [day, month, year] = dateStr.split('.').map(Number);
+                    const [hours, minutes] = timeStr.split(':').map(Number);
+                    
+                    currentLog = {
+                        timestamp: new Date(year, month - 1, day, hours, minutes),
+                        addressLines: [street.trim()]
+                    };
+                } else if (currentLog && line.trim() !== "") {
+                    currentLog.addressLines.push(line.trim());
+                }
+            });
+            if (currentLog) logs.push(currentLog);
+
+            // Adressen zusammenführen & Koordinaten zuweisen
+            return logs.map(log => {
+                const fullAddress = log.addressLines.join('\n');
+                return {
+                    ...log,
+                    address: fullAddress,
+                    coords: geoCoordinates[fullAddress] || [54.3232, 10.1234] // Default-Zentrum falls unbekannt
+                };
+            });
+        }
+
+        // 4. Karte initialisieren (Schlichtes Graustufen-Design)
+        function initMap() {
+            map = L.map('map', {
+                center: [54.3252, 10.1165],
+                zoom: 14,
+                zoomControl: false
+            });
+
+            // Schlichtes, modernes Karten-Layout laden (CartoDB Positron)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(map);
+
+            // Zoom-Buttons unten rechts platzieren
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            circleGroup = L.layerGroup().addTo(map);
+        }
+
+        // 5. Daten nach Zeiträumen filtern und auf Karte zeichnen
+        function updateDisplay() {
+            circleGroup.clearLayers();
+            const now = new Date();
+
+            // Filtern nach Zeitraum
+            const filtered = parsedLogs.filter(log => {
+                const diffTime = Math.abs(now - log.timestamp);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                switch(currentFilter) {
+                    case 'heute':
+                        return log.timestamp.toDateString() === now.toDateString();
+                    case 'woche':
+                        return diffDays <= 7;
+                    case 'monat':
+                        return log.timestamp.getMonth() === now.getMonth() && log.timestamp.getFullYear() === now.getFullYear();
+                    case 'jahr':
+                        return log.timestamp.getFullYear() === now.getFullYear();
+                    case 'immer':
+                    default:
+                        return true;
+                }
+            });
+
+            // Statistiken updaten
+            document.getElementById('stats-count').innerText = filtered.length;
+
+            // Aggregation: Zählen wie oft an welchem Ort, um Kreisgröße zu berechnen
+            const locationCounts = {};
+            filtered.forEach(log => {
+                locationCounts[log.address] = locationCounts[log.address] || { coords: log.coords, count: 0 };
+                locationCounts[log.address].count += 1;
+            });
+
+            // Kreise auf der Karte zeichnen
+            const bounds = [];
+            Object.keys(locationCounts).forEach(address => {
+                const data = locationCounts[address];
+                
+                // Formel für wachsende Kreisgröße basierend auf Anzahl der Punkte
+                const radius = 20 + (data.count * 15); 
+
+                const circle = L.circle(data.coords, {
+                    color: '#6366f1', // Indigo modern
+                    fillColor: '#818cf8',
+                    fillOpacity: 0.5,
+                    radius: radius,
+                    weight: 2
+                });
+
+                circle.bindPopup(`
+                    <div class="text-xs">
+                        <strong class="block mb-1 text-slate-200">${address.replace(/\n/g, ', ')}</strong>
+                        Hier warst du im gewählten Zeitraum: <span class="font-bold text-indigo-400">${data.count}x</span>
+                    </div>
+                `);
+                
+                circle.addTo(circleGroup);
+                bounds.push(data.coords);
+            });
+
+            // Karte optimal zoomen, falls Daten vorhanden sind
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+            }
+        }
+
+        // 6. Filter-Wechsel steuern
+        function changeTimeframe(timeframe) {
+            currentFilter = timeframe;
+            
+            // Buttons visuell updaten
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-900', 'text-white', 'shadow-sm');
+                btn.classList.add('bg-transparent', 'text-slate-600', 'hover:bg-slate-100');
+            });
+
+            const activeBtn = document.getElementById(`btn-${timeframe}`);
+            activeBtn.classList.remove('bg-transparent', 'text-slate-600', 'hover:bg-slate-100');
+            activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-sm');
+
+            updateDisplay();
+        }
+
+        // App starten
+        window.onload = () => {
+            initMap();
+            parsedLogs = parseCSV(csvData);
+            updateDisplay();
+        };
+    </script>
+</body>
+</html>
