@@ -25,6 +25,16 @@
             --text-main: #0f172a;
             --text-muted: #64748b;
             --bg-card: #f1f5f9;
+            /* Accent system */
+            --accent: #6366f1;
+            --accent-rgb: 99, 102, 241;
+            --accent-light: rgba(99,102,241,0.12);
+            --accent-mid: rgba(99,102,241,0.25);
+            --accent-fg: #ffffff;
+            --success: #10b981;
+            --success-light: rgba(16,185,129,0.12);
+            --warn: #f59e0b;
+            --danger: #ef4444;
         }
         .dark-theme {
             --bg-main: #09090b;
@@ -33,15 +43,23 @@
             --text-main: #f4f4f5;
             --text-muted: #a1a1aa;
             --bg-card: #18181b;
+            --accent-light: rgba(99,102,241,0.18);
+            --accent-mid: rgba(99,102,241,0.35);
         }
+        /* Accent color themes */
+        .accent-violet  { --accent: #6366f1; --accent-rgb: 99,102,241; }
+        .accent-emerald { --accent: #10b981; --accent-rgb: 16,185,129; }
+        .accent-rose    { --accent: #f43f5e; --accent-rgb: 244,63,94; }
+        .accent-amber   { --accent: #f59e0b; --accent-rgb: 245,158,11; }
+        .accent-sky     { --accent: #0ea5e9; --accent-rgb: 14,165,233; }
         body { background-color: var(--bg-main); color: var(--text-main); transition: background 0.3s, color 0.3s; }
         aside { background-color: var(--bg-sidebar); border-color: var(--border-color); }
         .card { background-color: var(--bg-card); border-color: var(--border-color); }
         .leaflet-popup-content-wrapper { background: var(--bg-sidebar); color: var(--text-main); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
 
         .tab-btn { transition: all 0.15s; }
-        .tab-btn.active { background: #0f172a; color: white; }
-        .dark-theme .tab-btn.active { background: white; color: #0f172a; }
+        .tab-btn.active { background: var(--accent); color: var(--accent-fg); }
+        .dark-theme .tab-btn.active { background: var(--accent); color: var(--accent-fg); }
 
         .leaflet-popup-content-wrapper {
             background: rgba(237, 232, 208, 0.75) !important;
@@ -83,39 +101,221 @@
 
         #import-progress-bar { transition: width 0.3s ease; }
 
-        /* === KRITISCHER FIX: Stabile Kartengröße === */
+        /* === LAYOUT === */
         #app-root {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
         }
-        @media (min-width: 768px) {
-            #app-root { flex-direction: row; overflow: hidden; }
-        }
 
         #sidebar {
-            width: 100%;
-            max-width: 100%;
-            border-bottom: 1px solid var(--border-color);
+            width: 320px;
+            min-width: 320px;
+            max-width: 320px;
+            border-right: 1px solid var(--border-color);
+            height: 100vh;
+            max-height: none;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            max-height: 45vh;
+        }
+
+        /* MOBILE: Sidebar als Bottom-Sheet, Karte immer fullscreen */
+        @media (max-width: 767px) {
+            #sidebar {
+                display: none;
+            }
+
+            #mobile-sheet-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                z-index: 2000;
+                background: rgba(0,0,0,0.2);
+            }
+            #mobile-sheet-overlay.open { display: block; }
+
+            #mobile-sheet {
+                position: fixed;
+                inset: 0;
+                z-index: 2100;
+                background: var(--bg-sidebar);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                transform: translateY(100%);
+                transition: transform 0.32s cubic-bezier(0.22,1,0.36,1);
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            #mobile-sheet.open {
+                transform: translateY(0);
+            }
+            #mobile-sheet-handle { display: none; }
+            #mobile-sheet-tabs {
+                display: flex;
+                gap: 6px;
+                padding: 56px 12px 8px;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+            #mobile-sheet-content {
+                flex: 1;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            #mobile-toggle-fab {
+                display: flex;
+                position: fixed;
+                bottom: 24px;
+                right: 20px;
+                z-index: 2200;
+                width: 52px;
+                height: 52px;
+                border-radius: 50%;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                border: none;
+                cursor: pointer;
+                background: var(--accent);
+                color: white;
+                box-shadow: 0 4px 20px rgba(var(--accent-rgb),0.45), 0 2px 8px rgba(0,0,0,0.2);
+                transition: transform 0.15s, box-shadow 0.15s;
+            }
+            #mobile-toggle-fab:active { transform: scale(0.92); }
+
+            /* Map controls on mobile: bottom left, above FAB */
+            #map-controls { bottom: 84px; }
+            #map-style-picker { bottom: 128px; left: 12px; }
         }
         @media (min-width: 768px) {
-            #sidebar {
-                width: 320px;
-                min-width: 320px;
-                max-width: 320px;
-                border-bottom: none;
-                border-right: 1px solid var(--border-color);
-                height: 100vh;
-                max-height: none;
+            #mobile-sheet-overlay, #mobile-sheet, #mobile-toggle-fab { display: none !important; }
+        }
+
+        /* Narrow mobile: vertical layout left edge */
+        @media (max-width: 400px) {
+            #map-controls {
+                left: 6px;
+                bottom: 84px;
+            }
+            #quick-settings {
+                flex-direction: column;
+                padding: 4px;
+                gap: 2px;
+            }
+            #quick-settings .qs-divider {
+                width: 20px;
+                height: 1px;
+                margin: 2px 4px;
+            }
+            #map-style-picker {
+                left: 6px;
+                bottom: auto;
+                top: auto;
+                right: auto;
+                bottom: 340px;
             }
         }
+
+        /* ===== MAP OVERLAY CONTROLS ===== */
+        #map-controls {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            top: auto;
+            z-index: 1000;
+        }
+        #quick-settings {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+        }
+        .qs-pill {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s;
+            color: var(--accent);
+        }
+        .qs-pill.active {
+            background: var(--accent-mid);
+            color: var(--accent);
+        }
+        .qs-pill:hover { background: var(--accent-light); }
+        .qs-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border-color);
+            margin: 0 2px;
+        }
+        #map-style-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.12s;
+            color: var(--accent);
+        }
+        #map-style-btn:hover { background: var(--accent-light); }
+        #map-style-picker {
+            position: absolute;
+            bottom: 56px;
+            left: 12px;
+            z-index: 1001;
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            min-width: 160px;
+        }
+        #map-style-picker.hidden { display: none; }
+        .msp-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            padding: 2px 8px 6px;
+        }
+        .msp-opt {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 7px 10px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-main);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .msp-opt:hover { background: var(--bg-card); }
+        .msp-opt.selected { background: var(--accent-light); color: var(--accent); font-weight: 700; }
 
         #map-container {
             flex: 1;
@@ -123,9 +323,6 @@
             min-height: 0;
             min-width: 0;
             overflow: hidden;
-        }
-        @media (max-width: 767px) {
-            #map-container { min-height: 55vh; }
         }
 
         #map {
@@ -184,6 +381,80 @@
             to { filter: brightness(1.2) drop-shadow(0 0 12px rgba(99,102,241,0.6)); }
         }
 
+        /* Import dialog */
+        #import-dialog-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 30000;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        #import-dialog-overlay.open { display: flex; }
+        #import-dialog {
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        #import-dialog h3 {
+            font-size: 14px;
+            font-weight: 700;
+            margin: 0 0 4px;
+            color: var(--text-main);
+        }
+        #import-dialog p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 0 0 16px;
+            line-height: 1.5;
+        }
+        #import-dialog .stats-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        #import-dialog .stat-box {
+            flex: 1;
+            text-align: center;
+            padding: 8px 4px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+        #import-dialog .stat-box .num {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--accent);
+        }
+        #import-dialog .stat-box .label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .import-dlg-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            margin-bottom: 6px;
+        }
+        .import-dlg-btn:last-child { margin-bottom: 0; }
+        .import-dlg-btn:hover { opacity: 0.85; }
+        .import-dlg-btn.primary { background: var(--accent); color: var(--accent-fg); }
+        .import-dlg-btn.secondary { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); }
+        .import-dlg-btn.danger { background: rgba(239,68,68,0.12); color: #ef4444; }
+
         /* Floating toast */
         #toast {
             position: fixed;
@@ -209,8 +480,8 @@
         .glow-point {
             position: absolute;
             border-radius: 50%;
-            background: rgba(99,102,241,0.4);
-            box-shadow: 0 0 20px 10px rgba(99,102,241,0.25);
+            background: rgba(var(--accent-rgb),0.4);
+            box-shadow: 0 0 20px 10px rgba(var(--accent-rgb),0.25);
             pointer-events: none;
             z-index: 398;
             transform: translate(-50%, -50%);
@@ -284,6 +555,86 @@
         .dp-row:last-child { border-bottom: none; }
         .dp-row-icon { font-size: 12px; width: 16px; text-align: center; }
         .dp-row-meta { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+
+        /* ===== ACHIEVEMENT CARDS ===== */
+        .achv-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .achv-card.unlocked {
+            border-color: rgba(var(--accent-rgb), 0.4);
+            background: var(--accent-light);
+        }
+        .achv-card.unlocked::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .achv-card .achv-icon {
+            font-size: 22px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: var(--bg-main);
+            flex-shrink: 0;
+        }
+        .achv-card.unlocked .achv-icon {
+            background: rgba(var(--accent-rgb), 0.15);
+        }
+        .achv-card .achv-body { flex: 1; min-width: 0; }
+        .achv-card .achv-title { font-size: 12px; font-weight: 700; }
+        .achv-card .achv-desc { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+        .achv-card .achv-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            flex-shrink: 0;
+        }
+        .achv-card.unlocked .achv-badge {
+            background: rgba(var(--accent-rgb), 0.2);
+            color: var(--accent);
+        }
+        .achv-card:not(.unlocked) .achv-badge {
+            background: var(--bg-main);
+            color: var(--text-muted);
+        }
+        .achv-card:not(.unlocked) { opacity: 0.55; }
+
+        /* Stat cards accent */
+        .stat-card-accent { border-color: rgba(var(--accent-rgb), 0.3) !important; }
+        .stat-card-accent .stat-val { color: var(--accent) !important; }
+
+        /* Filter btn active accent */
+        .filter-btn.is-active {
+            background: var(--accent) !important;
+            color: white !important;
+            opacity: 1 !important;
+        }
+
+        /* Accent picker */
+        .accent-dot {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.15s, border-color 0.15s;
+        }
+        .accent-dot.selected { border-color: var(--text-main); transform: scale(1.15); }
+        .accent-dot:hover { transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -303,9 +654,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-base font-bold tracking-tight">ExploreYourWay</h1>
-                    <p class="text-[10px]" style="color:var(--text-muted)">Fog of War · Advanced Analytics</p>
+                    <p class="text-[10px]" style="color:var(--text-muted)">Fog of War · Analytics</p>
                 </div>
-                <button onclick="toggleTheme()" class="p-2 rounded-lg border text-xs font-semibold cursor-pointer" style="border-color:var(--border-color);">☯ Theme</button>
+                <button onclick="toggleTheme()" class="p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-colors hover:opacity-80" style="border-color:var(--border-color);background:var(--bg-card)">
+                    <span id="theme-icon">🌙</span>
+                </button>
             </div>
 
             <!-- Import -->
@@ -375,13 +728,13 @@
                     <span class="text-[9px] uppercase tracking-wider" style="color:var(--text-muted)">Datenpunkte</span>
                     <div id="stats-count" class="text-xl font-bold">0</div>
                 </div>
-                <div class="card rounded-xl border p-3">
+                <div class="card rounded-xl border p-3 stat-card-accent">
                     <span class="text-[9px] uppercase tracking-wider" style="color:var(--text-muted)">Unique Orte</span>
-                    <div id="stats-unique" class="text-xl font-bold text-indigo-500">0</div>
+                    <div id="stats-unique" class="text-xl font-bold stat-val">0</div>
                 </div>
                 <div class="card rounded-xl border p-3">
                     <span class="text-[9px] uppercase tracking-wider" style="color:var(--text-muted)">Freigeschaltet</span>
-                    <div id="stats-unlocked" class="text-xl font-bold text-green-500">0</div>
+                    <div id="stats-unlocked" class="text-xl font-bold" style="color:var(--success)">0</div>
                 </div>
             </div>
             <div id="dataStatus" class="text-[9px] text-center tracking-wide hidden" style="color:var(--text-muted)"></div>
@@ -392,7 +745,7 @@
             <!-- Fläche Stats -->
             <div class="card rounded-xl border p-4 space-y-3">
                 <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Entdeckte Fläche</label>
-                <div class="text-3xl font-black text-green-500" id="explore-area">0 km²</div>
+                <div class="text-3xl font-black" id="explore-area" style="color:var(--accent)">0 km²</div>
                 <div class="text-xs" style="color:var(--text-muted)">1 unique Ort = 1 km² · Gleicher Ort mehrfach = zählt einmal</div>
                 <div class="border-t pt-3" style="border-color:var(--border-color)">
                     <div class="grid grid-cols-2 gap-2 text-center">
@@ -403,15 +756,31 @@
             </div>
 
             <!-- Achievement Liste -->
-            <div class="space-y-1">
-                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Achievements <span id="achv-count" class="font-normal opacity-60"></span></label>
-                <div id="achievement-list" class="space-y-1.5"></div>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Achievements</label>
+                    <span id="achv-count" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:var(--accent-light);color:var(--accent)"></span>
+                </div>
+                <div id="achievement-list" class="space-y-2"></div>
             </div>
         </div>
 
         <!-- TAB: EINSTELLUNGEN -->
         <div id="panel-einstellungen" class="flex-1 overflow-y-auto p-4 space-y-5 hidden">
             <h2 class="text-sm font-bold">Einstellungen</h2>
+
+            <!-- Akzentfarbe -->
+            <div class="space-y-2">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Akzentfarbe</label>
+                <div class="flex gap-2 items-center">
+                    <div class="accent-dot selected" style="background:#6366f1" onclick="setAccent('violet','#6366f1')" id="dot-violet"></div>
+                    <div class="accent-dot" style="background:#10b981" onclick="setAccent('emerald','#10b981')" id="dot-emerald"></div>
+                    <div class="accent-dot" style="background:#f43f5e" onclick="setAccent('rose','#f43f5e')" id="dot-rose"></div>
+                    <div class="accent-dot" style="background:#f59e0b" onclick="setAccent('amber','#f59e0b')" id="dot-amber"></div>
+                    <div class="accent-dot" style="background:#0ea5e9" onclick="setAccent('sky','#0ea5e9')" id="dot-sky"></div>
+                    <span class="text-[10px] ml-1" style="color:var(--text-muted)">Akzent</span>
+                </div>
+            </div>
 
             <div class="space-y-1.5">
                 <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">Karten-Stil</label>
@@ -491,6 +860,37 @@
                 <button onclick="clearAllData()" class="w-full text-xs font-semibold py-2 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20">🗑 Alle Daten löschen</button>
                 <button onclick="forceResave()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">💾 Jetzt speichern (Debug)</button>
             </div>
+
+            <!-- Feature Ideen -->
+            <div class="space-y-2 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">💡 Geplante Features</label>
+                <div class="space-y-1.5">
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--accent-light);border:1px solid rgba(var(--accent-rgb),0.2)">
+                        <span class="text-sm mt-0.5">🗓</span>
+                        <div><div class="text-xs font-semibold">Zeitachse / Heatmap-Kalender</div><div class="text-[10px]" style="color:var(--text-muted)">GitHub-Style Aktivitäts-Heatmap nach Tag/Monat</div></div>
+                    </div>
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                        <span class="text-sm mt-0.5">📊</span>
+                        <div><div class="text-xs font-semibold">Statistik-Charts</div><div class="text-[10px]" style="color:var(--text-muted)">Aktivitäts-Verlauf, Wetter-Auswertung, Tageszeit-Verteilung</div></div>
+                    </div>
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                        <span class="text-sm mt-0.5">🚀</span>
+                        <div><div class="text-xs font-semibold">Live GPS-Tracking</div><div class="text-[10px]" style="color:var(--text-muted)">Echtzeit-Aufnahme via Geolocation API direkt im Browser</div></div>
+                    </div>
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                        <span class="text-sm mt-0.5">🏅</span>
+                        <div><div class="text-xs font-semibold">XP & Level-System</div><div class="text-[10px]" style="color:var(--text-muted)">Punkte für neue Stadtteile, Länder und Distanz-Meilensteine</div></div>
+                    </div>
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                        <span class="text-sm mt-0.5">📍</span>
+                        <div><div class="text-xs font-semibold">Notizen & Fotos je Ort</div><div class="text-[10px]" style="color:var(--text-muted)">Erinnerungen und Bilder direkt einem besuchten Standort anheften</div></div>
+                    </div>
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                        <span class="text-sm mt-0.5">🔗</span>
+                        <div><div class="text-xs font-semibold">Teilen & Export als Bild</div><div class="text-[10px]" style="color:var(--text-muted)">Karte als PNG exportieren, Fog-of-War Screenshot-Sharing</div></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </aside>
 
@@ -500,6 +900,28 @@
         <canvas id="explored-canvas"></canvas>
         <div id="fog-layer"><div id="fog-backdrop"></div></div>
         <div id="glow-points"></div>
+
+        <!-- MAP OVERLAY CONTROLS -->
+        <div id="map-controls">
+            <div id="quick-settings">
+                <button class="qs-pill" id="qs-fog" onclick="quickToggle('fog')" title="Fog">🌫</button>
+                <button class="qs-pill active" id="qs-explore" onclick="quickToggle('explore')" title="Explore">🟢</button>
+                <button class="qs-pill" id="qs-yourway" onclick="quickToggle('yourway')" title="Your Way">📍</button>
+                <button class="qs-pill" id="qs-countries" onclick="quickToggle('countries')" title="Länder">🌍</button>
+                <div class="qs-divider"></div>
+                <button id="map-style-btn" onclick="toggleMapStylePicker()" title="Kartenstil">🗺</button>
+            </div>
+        </div>
+
+        <!-- Kartenstil Picker -->
+        <div id="map-style-picker" class="hidden">
+            <div class="msp-title">Kartenstil</div>
+            <button class="msp-opt" data-mode="light" onclick="pickMapStyle('light')">☀️ Standard</button>
+            <button class="msp-opt" data-mode="dark" onclick="pickMapStyle('dark')">🌑 Dunkel</button>
+            <button class="msp-opt" data-mode="satellite" onclick="pickMapStyle('satellite')">🛰 Satellit</button>
+            <button class="msp-opt" data-mode="topo" onclick="pickMapStyle('topo')">⛰ Topo</button>
+            <button class="msp-opt" data-mode="osm" onclick="pickMapStyle('osm')">🗾 OSM Classic</button>
+        </div>
 
         <!-- RIGHT DETAIL PANEL (slide-in beim Marker-Klick) -->
         <div id="detail-panel">
@@ -518,8 +940,41 @@
     </div>
 </div>
 
+<!-- Import merge dialog -->
+<div id="import-dialog-overlay">
+    <div id="import-dialog">
+        <h3>Import-Konflikt</h3>
+        <p id="import-dialog-desc">Die neue Datei enthält Daten, die sich mit vorhandenen überschneiden.</p>
+        <div class="stats-row" id="import-dialog-stats">
+            <div class="stat-box"><div class="num" id="dlg-existing">0</div><div class="label">Vorhanden</div></div>
+            <div class="stat-box"><div class="num" id="dlg-new">0</div><div class="label">Neue</div></div>
+            <div class="stat-box"><div class="num" id="dlg-dups">0</div><div class="label">Duplikate</div></div>
+        </div>
+        <button class="import-dlg-btn primary" onclick="importMergeChoice('replace')">Alles ersetzen</button>
+        <button class="import-dlg-btn secondary" onclick="importMergeChoice('merge')">Nur neue Punkte hinzufügen</button>
+        <button class="import-dlg-btn danger" onclick="importMergeChoice('cancel')">Abbrechen</button>
+    </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
+
+<!-- Mobile: Single Toggle-FAB -->
+<button id="mobile-toggle-fab" onclick="toggleMobileSheet()" aria-label="Menü öffnen">☰</button>
+
+<!-- Mobile: Bottom-Sheet Overlay (Tap-outside schließt) -->
+<div id="mobile-sheet-overlay" onclick="closeMobileSheet()"></div>
+
+<!-- Mobile: Bottom Sheet -->
+<div id="mobile-sheet">
+    <div id="mobile-sheet-handle"></div>
+    <div id="mobile-sheet-tabs">
+        <button onclick="switchMobileTab('karte')" id="mobile-tab-karte" class="tab-btn active flex-1 text-xs font-semibold py-2 rounded-lg">🗺 Karte</button>
+        <button onclick="switchMobileTab('entdeckt')" id="mobile-tab-entdeckt" class="tab-btn flex-1 text-xs font-semibold py-2 rounded-lg">🏆 Entdeckt</button>
+        <button onclick="switchMobileTab('einstellungen')" id="mobile-tab-einstellungen" class="tab-btn flex-1 text-xs font-semibold py-2 rounded-lg">⚙ Einst.</button>
+    </div>
+    <div id="mobile-sheet-content"></div>
+</div>
 
 <script>
 // =====================================================================
@@ -823,6 +1278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     requestAnimationFrame(() => {
         map.invalidateSize(true);
         updateDisplay();
+        syncQuickToggles();
     });
 });
 
@@ -913,6 +1369,8 @@ function switchTab(name) {
 function toggleTheme() {
     isDarkMode = !isDarkMode;
     document.body.classList.toggle('dark-theme', isDarkMode);
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = isDarkMode ? '☀️' : '🌙';
     const select = document.getElementById('mapModeSelect');
     if (select.value === 'light' && isDarkMode) { select.value = 'dark'; changeMapLayer(); }
     else if (select.value === 'dark' && !isDarkMode) { select.value = 'light'; changeMapLayer(); }
@@ -1028,6 +1486,32 @@ function saveState() {
 // =====================================================================
 // FILE IMPORT (CSV + TXT)
 // =====================================================================
+function logKey(l) {
+    if (!l || !l.coords) return '';
+    const lat = l.coords[0]?.toFixed(4) || '';
+    const lon = l.coords[1]?.toFixed(4) || '';
+    const ts = l.timestamp instanceof Date ? l.timestamp.toISOString() : (l.timestamp || '');
+    return `${lat},${lon}|${ts}`;
+}
+
+let _pendingImportLogs = null;
+
+function showImportDialog(stats, callback) {
+    _pendingImportCallback = callback;
+    document.getElementById('dlg-existing').textContent = stats.existing;
+    document.getElementById('dlg-new').textContent = stats.newCount;
+    document.getElementById('dlg-dups').textContent = stats.dups;
+    document.getElementById('import-dialog-overlay').classList.add('open');
+}
+let _pendingImportCallback = null;
+
+function importMergeChoice(choice) {
+    document.getElementById('import-dialog-overlay').classList.remove('open');
+    const cb = _pendingImportCallback;
+    _pendingImportCallback = null;
+    if (cb) cb(choice);
+}
+
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1038,20 +1522,63 @@ function handleFileUpload(event) {
         try {
             const text = e.target.result;
             const isTxt = file.name.endsWith('.txt') || text.includes('|');
-            if (isTxt) {
-                await parseAndGeocodeTXT(text);
-            } else {
-                await parseAndGeocodeCSV(text);
+            const newLogs = isTxt ? await parseAndGeocodeTXT(text, true) : await parseAndGeocodeCSV(text, true);
+            if (!newLogs || newLogs.length === 0) {
+                showToast('Keine neuen Daten importiert');
+                document.getElementById('importStatusContainer').classList.add('hidden');
+                document.getElementById('csvFileInput').value = '';
+                return;
             }
-            importCount++;
+            if (parsedLogs.length === 0) {
+                parsedLogs = newLogs.sort((a, b) => a.timestamp - b.timestamp);
+                importCount++;
+                fillVisitedCountriesFromLogs();
+                saveState();
+                updateDisplay();
+                updateExploreTab();
+                showToast(`${newLogs.length} Einträge importiert`);
+            } else {
+                const existingKeys = new Set(parsedLogs.map(logKey));
+                const dups = newLogs.filter(l => existingKeys.has(logKey(l)));
+                const unique = newLogs.filter(l => !existingKeys.has(logKey(l)));
+                if (dups.length === 0) {
+                    parsedLogs = [...parsedLogs, ...newLogs].sort((a, b) => a.timestamp - b.timestamp);
+                    importCount++;
+                    fillVisitedCountriesFromLogs();
+                    saveState();
+                    updateDisplay();
+                    updateExploreTab();
+                    showToast(`${newLogs.length} Einträge importiert`);
+                } else {
+                    showImportDialog({ existing: parsedLogs.length, newCount: newLogs.length, dups: dups.length }, choice => {
+                        if (choice === 'replace') {
+                            parsedLogs = newLogs.sort((a, b) => a.timestamp - b.timestamp);
+                            importCount++;
+                            fillVisitedCountriesFromLogs();
+                            saveState();
+                            updateDisplay();
+                            updateExploreTab();
+                            showToast(`Alle Daten ersetzt: ${newLogs.length} Einträge`);
+                        } else if (choice === 'merge') {
+                            parsedLogs = [...parsedLogs, ...unique].sort((a, b) => a.timestamp - b.timestamp);
+                            importCount++;
+                            fillVisitedCountriesFromLogs();
+                            saveState();
+                            updateDisplay();
+                            updateExploreTab();
+                            showToast(`${unique.length} neue Einträge hinzugefügt (${dups.length} Duplikate übersprungen)`);
+                        }
+                        document.getElementById('importStatusContainer').classList.add('hidden');
+                        document.getElementById('csvFileInput').value = '';
+                    });
+                    return;
+                }
+            }
         } catch(err) {
             console.error('❌ Import-Fehler:', err);
             showToast('❌ Import fehlgeschlagen: ' + err.message);
         }
         document.getElementById('importStatusContainer').classList.add('hidden');
-        saveState();
-        updateDisplay();
-        updateExploreTab();
         document.getElementById('csvFileInput').value = '';
     };
     reader.readAsText(file);
@@ -1060,8 +1587,8 @@ function handleFileUpload(event) {
 // =====================================================================
 // TXT PARSER (|...|-Format) — ROBUST & FEHLERTOLERANT
 // =====================================================================
-async function parseAndGeocodeTXT(text) {
-    if (!text) return;
+async function parseAndGeocodeTXT(text, returnOnly) {
+    if (!text) return returnOnly ? [] : undefined;
 
     // Extrahiere Einträge zwischen |...|
     // Toleriert: Whitespace, unvollständige Zeilen, gemischte Zeilenumbrüche
@@ -1201,6 +1728,11 @@ async function parseAndGeocodeTXT(text) {
         document.getElementById('imp-fail').textContent = fail;
     }
 
+    if (returnOnly) {
+        document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
+        if (!fail) errLog.classList.add('hidden');
+        return tempLogs;
+    }
     parsedLogs = [...parsedLogs, ...tempLogs].sort((a, b) => a.timestamp - b.timestamp);
     fillVisitedCountriesFromLogs();
     document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
@@ -1211,8 +1743,8 @@ async function parseAndGeocodeTXT(text) {
 // =====================================================================
 // CSV PARSER (bestehend, aber robuster gemacht)
 // =====================================================================
-async function parseAndGeocodeCSV(csvText) {
-    if (!csvText) return;
+async function parseAndGeocodeCSV(csvText, returnOnly) {
+    if (!csvText) return returnOnly ? [] : undefined;
     const lines = csvText.trim().split(/\r?\n/);
     const tempLogs = [];
     let currentLog = null;
@@ -1270,6 +1802,11 @@ async function parseAndGeocodeCSV(csvText) {
         document.getElementById('imp-fail').textContent = fail;
     }
 
+    if (returnOnly) {
+        document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
+        if (!fail) errLog.classList.add('hidden');
+        return finalLogs;
+    }
     parsedLogs = [...parsedLogs, ...finalLogs].sort((a,b) => a.timestamp - b.timestamp);
     fillVisitedCountriesFromLogs();
     document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
@@ -1551,8 +2088,8 @@ function updateGlowPoints() {
         el.style.width = size + 'px';
         el.style.height = size + 'px';
         el.style.opacity = 0.3 + intensity * 0.5;
-        el.style.background = `rgba(99,102,241,${0.3 + intensity * 0.5})`;
-        el.style.boxShadow = `0 0 ${10 + intensity * 20}px ${5 + intensity * 10}px rgba(99,102,241,${0.2 + intensity * 0.3})`;
+        el.style.background = `rgba(var(--accent-rgb),${0.3 + intensity * 0.5})`;
+        el.style.boxShadow = `0 0 ${10 + intensity * 20}px ${5 + intensity * 10}px rgba(var(--accent-rgb),${0.2 + intensity * 0.3})`;
         container.appendChild(el);
     });
 }
@@ -2169,18 +2706,18 @@ function updateExploreTab() {
     // Achievements
     const state = { logs: parsedLogs, importCount, visitedCountries };
     const unlocked = ACHIEVEMENTS.filter(a => a.check(state));
-    document.getElementById('achv-count').textContent = `(${unlocked.length}/${ACHIEVEMENTS.length})`;
+    document.getElementById('achv-count').textContent = `${unlocked.length}/${ACHIEVEMENTS.length}`;
 
     const list = document.getElementById('achievement-list');
     list.innerHTML = ACHIEVEMENTS.map(a => {
         const isUnlocked = a.check(state);
-        return `<div class="flex items-center gap-2 p-2 rounded-lg border ${isUnlocked ? '' : 'opacity-40'}" style="background:var(--bg-card);border-color:var(--border-color)">
-            <span class="text-xl">${a.icon}</span>
-            <div>
-                <div class="text-xs font-bold">${a.title}</div>
-                <div class="text-[10px]" style="color:var(--text-muted)">${a.desc}</div>
+        return `<div class="achv-card ${isUnlocked ? 'unlocked' : ''}">
+            <div class="achv-icon">${a.icon}</div>
+            <div class="achv-body">
+                <div class="achv-title">${a.title}</div>
+                <div class="achv-desc">${a.desc}</div>
             </div>
-            ${isUnlocked ? '<span class="ml-auto text-green-500 text-xs">✓</span>' : '<span class="ml-auto text-[10px]" style="color:var(--text-muted)">🔒</span>'}
+            <div class="achv-badge">${isUnlocked ? '✓ Done' : '🔒'}</div>
         </div>`;
     }).join('');
 
@@ -2271,14 +2808,18 @@ function filterCountryList(value) {
 function changeTimeframe(timeframe) {
     currentFilter = timeframe;
     document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('is-active');
         btn.style.background = 'var(--bg-card)';
         btn.style.color = 'var(--text-main)';
         btn.style.opacity = '0.6';
     });
     const btn = document.getElementById('btn-' + timeframe);
-    btn.style.background = '#0f172a';
-    btn.style.color = 'white';
-    btn.style.opacity = '1';
+    if (btn) {
+        btn.classList.add('is-active');
+        btn.style.background = 'var(--accent)';
+        btn.style.color = 'white';
+        btn.style.opacity = '1';
+    }
     document.getElementById('date-picker-container').classList.toggle('hidden', timeframe !== 'datum');
     updateDisplay();
 }
@@ -2287,6 +2828,7 @@ function toggleLayer() {
     saveState();
     updateDisplay();
     scheduleFogUpdate();
+    syncQuickToggles();
 }
 
 // =====================================================================
@@ -2301,8 +2843,158 @@ function showToast(msg) {
 }
 
 // =====================================================================
+// MAP STYLE PICKER (Overlay auf Karte)
+// =====================================================================
+function toggleMapStylePicker() {
+    const picker = document.getElementById('map-style-picker');
+    picker.classList.toggle('hidden');
+    // Close on next map click
+    if (!picker.classList.contains('hidden')) {
+        setTimeout(() => {
+            map.once('click', () => picker.classList.add('hidden'));
+        }, 50);
+    }
+}
+
+function pickMapStyle(mode) {
+    document.getElementById('mapModeSelect').value = mode;
+    changeMapLayer();
+    document.getElementById('map-style-picker').classList.add('hidden');
+    // Update selected state
+    document.querySelectorAll('.msp-opt').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.mode === mode);
+    });
+    // Update icon
+    const icons = { light:'🗺', dark:'🌑', satellite:'🛰', topo:'⛰', osm:'🗾' };
+    document.getElementById('map-style-btn').textContent = icons[mode] || '🗺';
+}
+
+// =====================================================================
+// QUICK TOGGLE PILLS
+// =====================================================================
+function quickToggle(type) {
+    const map_ = { fog: 'fogToggle', explore: 'exploreModeToggle', yourway: 'yourWayToggle', countries: 'countryModeToggle' };
+    const pill_ = { fog: 'qs-fog', explore: 'qs-explore', yourway: 'qs-yourway', countries: 'qs-countries' };
+    const toggle = document.getElementById(map_[type]);
+    const pill = document.getElementById(pill_[type]);
+    if (!toggle || !pill) return;
+    toggle.checked = !toggle.checked;
+    pill.classList.toggle('active', toggle.checked);
+    toggleLayer();
+}
+
+function syncQuickToggles() {
+    const map_ = { fog: 'fogToggle', explore: 'exploreModeToggle', yourway: 'yourWayToggle', countries: 'countryModeToggle' };
+    const pill_ = { fog: 'qs-fog', explore: 'qs-explore', yourway: 'qs-yourway', countries: 'qs-countries' };
+    Object.entries(map_).forEach(([type, toggleId]) => {
+        const toggle = document.getElementById(toggleId);
+        const pill = document.getElementById(pill_[type]);
+        if (toggle && pill) pill.classList.toggle('active', toggle.checked);
+    });
+    // Sync map style picker selection
+    const mode = document.getElementById('mapModeSelect').value;
+    document.querySelectorAll('.msp-opt').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.mode === mode);
+    });
+    const icons = { light:'🗺', dark:'🌑', satellite:'🛰', topo:'⛰', osm:'🗾' };
+    const styleBtn = document.getElementById('map-style-btn');
+    if (styleBtn) styleBtn.textContent = icons[mode] || '🗺';
+}
+
+// =====================================================================
+// ACCENT COLOR
+// =====================================================================
+let currentAccent = 'violet';
+const ACCENT_CONFIGS = {
+    violet:  { hex: '#6366f1', rgb: '99,102,241' },
+    emerald: { hex: '#10b981', rgb: '16,185,129' },
+    rose:    { hex: '#f43f5e', rgb: '244,63,94' },
+    amber:   { hex: '#f59e0b', rgb: '245,158,11' },
+    sky:     { hex: '#0ea5e9', rgb: '14,165,233' },
+};
+
+function setAccent(name, hex) {
+    const cfg = ACCENT_CONFIGS[name];
+    if (!cfg) return;
+    currentAccent = name;
+    document.documentElement.style.setProperty('--accent', cfg.hex);
+    document.documentElement.style.setProperty('--accent-rgb', cfg.rgb);
+    document.documentElement.style.setProperty('--accent-light', `rgba(${cfg.rgb},0.12)`);
+    document.documentElement.style.setProperty('--accent-mid', `rgba(${cfg.rgb},0.25)`);
+    document.querySelectorAll('.accent-dot').forEach(d => d.classList.remove('selected'));
+    const dot = document.getElementById('dot-' + name);
+    if (dot) dot.classList.add('selected');
+    const activeFilter = document.querySelector('.filter-btn.is-active');
+    if (activeFilter) activeFilter.style.background = cfg.hex;
+    try { localStorage.setItem('eyw_accent', name); } catch(e) {}
+    showToast('🎨 Akzentfarbe geändert');
+}
+
+// =====================================================================
+// MOBILE BOTTOM SHEET
+// =====================================================================
+let mobileSheetOpen = false;
+let currentMobileTab = 'karte';
+
+function toggleMobileSheet() {
+    if (mobileSheetOpen) {
+        closeMobileSheet();
+    } else {
+        openMobileSheet();
+    }
+}
+
+function openMobileSheet() {
+    mobileSheetOpen = true;
+    document.getElementById('mobile-sheet').classList.add('open');
+    document.getElementById('mobile-sheet-overlay').classList.add('open');
+    document.getElementById('mobile-toggle-fab').textContent = '✕';
+    renderMobileSheetContent(currentMobileTab);
+    requestAnimationFrame(() => { map.invalidateSize(true); });
+}
+
+function closeMobileSheet() {
+    mobileSheetOpen = false;
+    document.getElementById('mobile-sheet').classList.remove('open');
+    document.getElementById('mobile-sheet-overlay').classList.remove('open');
+    document.getElementById('mobile-toggle-fab').textContent = '☰';
+    requestAnimationFrame(() => { map.invalidateSize(true); });
+}
+
+function switchMobileTab(name) {
+    currentMobileTab = name;
+    ['karte','entdeckt','einstellungen'].forEach(t => {
+        const btn = document.getElementById('mobile-tab-' + t);
+        if (btn) btn.classList.toggle('active', t === name);
+    });
+    renderMobileSheetContent(name);
+}
+
+function renderMobileSheetContent(tabName) {
+    if (tabName === 'entdeckt') updateExploreTab();
+    if (tabName === 'einstellungen') updateInspector();
+    const panel = document.getElementById('panel-' + tabName);
+    const target = document.getElementById('mobile-sheet-content');
+    if (!panel || !target) return;
+    target.innerHTML = panel.innerHTML;
+    // Re-bind checkboxes: sync state from real DOM
+    ['yourWayToggle','exploreModeToggle','fogToggle','countryModeToggle'].forEach(id => {
+        const orig = document.getElementById(id);
+        const copy = target.querySelector('#' + id);
+        if (orig && copy) copy.checked = orig.checked;
+    });
+}
+
+// =====================================================================
 // START
 // =====================================================================
+// Load saved accent
+(function loadSavedAccent() {
+    try {
+        const saved = localStorage.getItem('eyw_accent');
+        if (saved && ACCENT_CONFIGS[saved]) setAccent(saved, ACCENT_CONFIGS[saved].hex);
+    } catch(e) {}
+})();
 </script>
 </body>
 </html>
