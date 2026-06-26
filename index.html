@@ -455,6 +455,56 @@
         .import-dlg-btn.secondary { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); }
         .import-dlg-btn.danger { background: rgba(239,68,68,0.12); color: #ef4444; }
 
+        /* Import results detail */
+        #import-detail-btn {
+            background: none; border: none; cursor: pointer; font-size: 13px;
+            color: var(--accent); padding: 2px 6px; border-radius: 6px;
+            transition: background 0.12s;
+        }
+        #import-detail-btn:hover { background: var(--accent-light); }
+        #import-detail-overlay {
+            position: fixed; inset: 0; z-index: 30000;
+            background: rgba(0,0,0,0.4); display: none;
+            align-items: center; justify-content: center;
+        }
+        #import-detail-overlay.open { display: flex; }
+        #import-detail-panel {
+            background: var(--bg-sidebar); border: 1px solid var(--border-color);
+            border-radius: 16px; padding: 16px; max-width: 520px;
+            width: 92%; max-height: 80vh; display: flex;
+            flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        #import-detail-panel h3 {
+            font-size: 13px; font-weight: 700; margin: 0 0 2px; color: var(--text-main);
+        }
+        #import-detail-panel .sub {
+            font-size: 10px; color: var(--text-muted); margin-bottom: 10px;
+        }
+        #import-detail-list {
+            flex: 1; overflow-y: auto; border: 1px solid var(--border-color);
+            border-radius: 10px; background: var(--bg-card);
+        }
+        .import-detail-row {
+            display: flex; align-items: flex-start; gap: 6px;
+            padding: 5px 8px; border-bottom: 1px solid var(--border-color);
+            font-size: 10px; line-height: 1.4;
+        }
+        .import-detail-row:last-child { border-bottom: none; }
+        .import-detail-row .idr-icon { font-size: 11px; width: 14px; text-align: center; flex-shrink: 0; margin-top: 1px; }
+        .import-detail-row .idr-body { flex: 1; min-width: 0; }
+        .import-detail-row .idr-addr { color: var(--text-main); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .import-detail-row .idr-meta { color: var(--text-muted); font-size: 9px; }
+        .import-detail-row .idr-reason { color: #ef4444; font-size: 9px; }
+        .import-detail-row.idr-ok .idr-icon { color: #10b981; }
+        .import-detail-row.idr-fail .idr-icon { color: #ef4444; }
+        #import-detail-close {
+            display: block; width: 100%; margin-top: 8px; padding: 8px;
+            border-radius: 10px; border: none; background: var(--bg-card);
+            color: var(--text-main); font-size: 11px; font-weight: 600;
+            cursor: pointer; transition: opacity 0.15s;
+        }
+        #import-detail-close:hover { opacity: 0.8; }
+
         /* Floating toast */
         #toast {
             position: fixed;
@@ -682,6 +732,9 @@
                         <div class="text-center p-1 rounded" style="background:var(--bg-main)"><div id="imp-ok" class="font-bold text-xs text-green-500">0</div><div class="text-[9px]" style="color:var(--text-muted)">Geocodiert</div></div>
                         <div class="text-center p-1 rounded" style="background:var(--bg-main)"><div id="imp-fail" class="font-bold text-xs text-red-400">0</div><div class="text-[9px]" style="color:var(--text-muted)">Fehler</div></div>
                     </div>
+                    <div class="flex justify-end mt-1">
+                        <button id="import-detail-btn" class="hidden" onclick="showImportDetail()">📋 Details</button>
+                    </div>
                     <div id="importErrorLog" class="mt-1 hidden max-h-16 overflow-y-auto text-[9px]" style="color:var(--text-muted)"></div>
                 </div>
             </div>
@@ -762,6 +815,42 @@
                     <span id="achv-count" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:var(--accent-light);color:var(--accent)"></span>
                 </div>
                 <div id="achievement-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Heatmap Kalender -->
+            <div class="space-y-2 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">🗓 Aktivitäts-Heatmap</label>
+                <div id="heatmap-container" class="overflow-x-auto" style="background:var(--bg-card);border-radius:10px;border:1px solid var(--border-color);padding:10px">
+                    <div id="heatmap-grid" style="display:flex;gap:2px;min-height:80px;"></div>
+                    <div class="flex items-center gap-1 mt-1 text-[9px]" style="color:var(--text-muted)">
+                        <span>Weniger</span>
+                        <div style="width:10px;height:10px;border-radius:2px;background:rgba(var(--accent-rgb),0.08)"></div>
+                        <div style="width:10px;height:10px;border-radius:2px;background:rgba(var(--accent-rgb),0.25)"></div>
+                        <div style="width:10px;height:10px;border-radius:2px;background:rgba(var(--accent-rgb),0.5)"></div>
+                        <div style="width:10px;height:10px;border-radius:2px;background:rgba(var(--accent-rgb),0.75)"></div>
+                        <div style="width:10px;height:10px;border-radius:2px;background:var(--accent)"></div>
+                        <span>Mehr</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistik-Charts -->
+            <div class="space-y-2 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">📊 Statistik-Charts</label>
+                <div id="charts-container" class="space-y-3">
+                    <div style="background:var(--bg-card);border-radius:10px;border:1px solid var(--border-color);padding:10px">
+                        <div class="text-[9px] font-semibold mb-1" style="color:var(--text-muted)">Aktivität pro Tag (letzte 14 Tage)</div>
+                        <canvas id="chart-activity" height="80" style="width:100%"></canvas>
+                    </div>
+                    <div style="background:var(--bg-card);border-radius:10px;border:1px solid var(--border-color);padding:10px">
+                        <div class="text-[9px] font-semibold mb-1" style="color:var(--text-muted)">Wetter-Verteilung</div>
+                        <canvas id="chart-weather" height="70" style="width:100%"></canvas>
+                    </div>
+                    <div style="background:var(--bg-card);border-radius:10px;border:1px solid var(--border-color);padding:10px">
+                        <div class="text-[9px] font-semibold mb-1" style="color:var(--text-muted)">Tageszeit-Verteilung</div>
+                        <canvas id="chart-timeofday" height="70" style="width:100%"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -861,31 +950,39 @@
                 <button onclick="forceResave()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-main)">💾 Jetzt speichern (Debug)</button>
             </div>
 
-            <!-- Feature Ideen -->
+            <!-- Live GPS-Tracking -->
             <div class="space-y-2 pt-2 border-t" style="border-color:var(--border-color)">
-                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">💡 Geplante Features</label>
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">🚀 Live GPS-Tracking</label>
+                <p class="text-[9px]" style="color:var(--text-muted)">Aktuelle Position per Browser-Geolocation aufzeichnen.</p>
+                <div class="flex gap-2">
+                    <button id="gps-start-btn" onclick="startGpsTracking()" class="flex-1 text-xs font-semibold py-2 rounded-lg border" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:#10b981">▶ Start</button>
+                    <button id="gps-stop-btn" onclick="stopGpsTracking()" disabled class="flex-1 text-xs font-semibold py-2 rounded-lg border opacity-40" style="background:var(--bg-card);border-color:var(--border-color);color:var(--text-muted)">⏹ Stop</button>
+                </div>
+                <div id="gps-status" class="text-[9px] text-center hidden" style="color:var(--text-muted)">—</div>
+                <div class="flex items-center gap-2 text-[9px]" style="color:var(--text-muted)">
+                    <span>📍</span>
+                    <span id="gps-coords">—</span>
+                    <span id="gps-accuracy"></span>
+                </div>
+                <div class="text-[9px]" style="color:var(--text-muted)">
+                    Aufgezeichnet: <span id="gps-count">0</span> Punkte
+                    <button onclick="saveGpsPoints()" id="gps-save-btn" class="ml-2 text-xs font-semibold px-2 py-0.5 rounded border hidden" style="background:var(--accent-light);border-color:rgba(var(--accent-rgb),0.3);color:var(--accent)">Speichern</button>
+                </div>
+            </div>
+
+            <!-- Weitere geplante Features -->
+            <div class="space-y-2 pt-2 border-t" style="border-color:var(--border-color)">
+                <label class="text-[10px] font-bold uppercase tracking-wider opacity-60">💡 In Entwicklung</label>
                 <div class="space-y-1.5">
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--accent-light);border:1px solid rgba(var(--accent-rgb),0.2)">
-                        <span class="text-sm mt-0.5">🗓</span>
-                        <div><div class="text-xs font-semibold">Zeitachse / Heatmap-Kalender</div><div class="text-[10px]" style="color:var(--text-muted)">GitHub-Style Aktivitäts-Heatmap nach Tag/Monat</div></div>
-                    </div>
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
-                        <span class="text-sm mt-0.5">📊</span>
-                        <div><div class="text-xs font-semibold">Statistik-Charts</div><div class="text-[10px]" style="color:var(--text-muted)">Aktivitäts-Verlauf, Wetter-Auswertung, Tageszeit-Verteilung</div></div>
-                    </div>
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
-                        <span class="text-sm mt-0.5">🚀</span>
-                        <div><div class="text-xs font-semibold">Live GPS-Tracking</div><div class="text-[10px]" style="color:var(--text-muted)">Echtzeit-Aufnahme via Geolocation API direkt im Browser</div></div>
-                    </div>
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color);opacity:0.5">
                         <span class="text-sm mt-0.5">🏅</span>
                         <div><div class="text-xs font-semibold">XP & Level-System</div><div class="text-[10px]" style="color:var(--text-muted)">Punkte für neue Stadtteile, Länder und Distanz-Meilensteine</div></div>
                     </div>
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color);opacity:0.5">
                         <span class="text-sm mt-0.5">📍</span>
                         <div><div class="text-xs font-semibold">Notizen & Fotos je Ort</div><div class="text-[10px]" style="color:var(--text-muted)">Erinnerungen und Bilder direkt einem besuchten Standort anheften</div></div>
                     </div>
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color)">
+                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color);opacity:0.5">
                         <span class="text-sm mt-0.5">🔗</span>
                         <div><div class="text-xs font-semibold">Teilen & Export als Bild</div><div class="text-[10px]" style="color:var(--text-muted)">Karte als PNG exportieren, Fog-of-War Screenshot-Sharing</div></div>
                     </div>
@@ -952,7 +1049,18 @@
         </div>
         <button class="import-dlg-btn primary" onclick="importMergeChoice('replace')">Alles ersetzen</button>
         <button class="import-dlg-btn secondary" onclick="importMergeChoice('merge')">Nur neue Punkte hinzufügen</button>
+        <button class="import-dlg-btn secondary" onclick="importMergeChoice('details')">Details anzeigen</button>
         <button class="import-dlg-btn danger" onclick="importMergeChoice('cancel')">Abbrechen</button>
+    </div>
+</div>
+
+<!-- Import detail viewer -->
+<div id="import-detail-overlay" onclick="if(event.target===this)closeImportDetail()">
+    <div id="import-detail-panel">
+        <h3>Import-Details</h3>
+        <div class="sub" id="import-detail-summary">—</div>
+        <div id="import-detail-list"></div>
+        <button id="import-detail-close" onclick="closeImportDetail()">Schließen</button>
     </div>
 </div>
 
@@ -1509,7 +1617,35 @@ function importMergeChoice(choice) {
     document.getElementById('import-dialog-overlay').classList.remove('open');
     const cb = _pendingImportCallback;
     _pendingImportCallback = null;
+    if (choice === 'details') {
+        showImportDetail();
+        return;
+    }
     if (cb) cb(choice);
+}
+
+function showImportDetail() {
+    const panel = document.getElementById('import-detail-panel');
+    const list = document.getElementById('import-detail-list');
+    const summary = document.getElementById('import-detail-summary');
+    const results = window._lastImportResults || [];
+    const ok = window._lastImportOk || 0;
+    const fail = window._lastImportFail || 0;
+    summary.textContent = `${ok} erfolgreich, ${fail} fehlgeschlagen — insgesamt ${results.length} Einträge`;
+    list.innerHTML = results.map(r => `
+        <div class="import-detail-row ${r.status === 'ok' ? 'idr-ok' : 'idr-fail'}">
+            <div class="idr-icon">${r.status === 'ok' ? '✅' : '❌'}</div>
+            <div class="idr-body">
+                <div class="idr-addr">${r.status === 'ok' ? r.address : r.address}</div>
+                <div class="idr-meta">${r.status === 'ok' ? (r.reason || '') : ''}</div>
+                ${r.status === 'fail' ? `<div class="idr-reason">${r.reason}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('import-detail-overlay').classList.add('open');
+}
+function closeImportDetail() {
+    document.getElementById('import-detail-overlay').classList.remove('open');
 }
 
 function handleFileUpload(event) {
@@ -1537,6 +1673,7 @@ function handleFileUpload(event) {
                 updateDisplay();
                 updateExploreTab();
                 showToast(`${newLogs.length} Einträge importiert`);
+                setTimeout(showImportDetail, 500);
             } else {
                 const existingKeys = new Set(parsedLogs.map(logKey));
                 const dups = newLogs.filter(l => existingKeys.has(logKey(l)));
@@ -1549,6 +1686,7 @@ function handleFileUpload(event) {
                     updateDisplay();
                     updateExploreTab();
                     showToast(`${newLogs.length} Einträge importiert`);
+                    setTimeout(showImportDetail, 500);
                 } else {
                     showImportDialog({ existing: parsedLogs.length, newCount: newLogs.length, dups: dups.length }, choice => {
                         if (choice === 'replace') {
@@ -1559,6 +1697,7 @@ function handleFileUpload(event) {
                             updateDisplay();
                             updateExploreTab();
                             showToast(`Alle Daten ersetzt: ${newLogs.length} Einträge`);
+                            setTimeout(showImportDetail, 500);
                         } else if (choice === 'merge') {
                             parsedLogs = [...parsedLogs, ...unique].sort((a, b) => a.timestamp - b.timestamp);
                             importCount++;
@@ -1567,6 +1706,7 @@ function handleFileUpload(event) {
                             updateDisplay();
                             updateExploreTab();
                             showToast(`${unique.length} neue Einträge hinzugefügt (${dups.length} Duplikate übersprungen)`);
+                            setTimeout(showImportDetail, 500);
                         }
                         document.getElementById('importStatusContainer').classList.add('hidden');
                         document.getElementById('csvFileInput').value = '';
@@ -1590,8 +1730,6 @@ function handleFileUpload(event) {
 async function parseAndGeocodeTXT(text, returnOnly) {
     if (!text) return returnOnly ? [] : undefined;
 
-    // Extrahiere Einträge zwischen |...|
-    // Toleriert: Whitespace, unvollständige Zeilen, gemischte Zeilenumbrüche
     const entries = [];
     let current = '';
     let inPipe = false;
@@ -1600,7 +1738,6 @@ async function parseAndGeocodeTXT(text, returnOnly) {
         const ch = text[i];
         if (ch === '|') {
             if (inPipe) {
-                // Ende eines Eintrags
                 const trimmed = current.trim();
                 if (trimmed) entries.push(trimmed);
                 current = '';
@@ -1613,21 +1750,19 @@ async function parseAndGeocodeTXT(text, returnOnly) {
             current += ch;
         }
     }
-    // Falls letzter Eintrag nicht geschlossen
     if (inPipe && current.trim()) entries.push(current.trim());
 
     if (entries.length === 0) {
         showToast('Keine gültigen |...|-Einträge gefunden');
-        return;
+        return returnOnly ? [] : undefined;
     }
 
     document.getElementById('imp-total').textContent = entries.length;
     document.getElementById('importStats').classList.remove('hidden');
 
     const tempLogs = [];
+    const results = [];
     let ok = 0, fail = 0;
-    const failedAddr = [];
-
     const errLog = document.getElementById('importErrorLog');
 
     for (let i = 0; i < entries.length; i++) {
@@ -1635,11 +1770,28 @@ async function parseAndGeocodeTXT(text, returnOnly) {
         const pct = Math.round(((i + 1) / entries.length) * 100);
         document.getElementById('import-progress-bar').style.width = pct + '%';
         document.getElementById('importPercent').textContent = pct + '%';
-        document.getElementById('importStatusText').textContent = `Parsing ${i + 1} / ${entries.length}…`;
+        document.getElementById('importStatusText').textContent = `Verarbeite ${i + 1} / ${entries.length}…`;
         document.getElementById('liveAddressTracker').textContent = raw.replace(/\n/g, ' | ').substring(0, 60);
 
-        // Koordinaten via Regex extrahieren
-        // Formate: "54.32, 10.12", "54.3232|10.1234", "lat 54.32 lon 10.12"
+        const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+        let timestamp = new Date();
+        let weather = { condition: 'Sonne', text: '☀️ Heiter, 21°C' };
+        let cleanAddress = raw.replace(/\|/g, '').trim();
+
+        const dtMatch = cleanAddress.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s*,\s*(\d{1,2}):(\d{2})/);
+        if (dtMatch) {
+            const [, d, m, y, h, min] = dtMatch;
+            timestamp = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min));
+            const dayNum = parseInt(d);
+            if (dayNum % 3 === 0) weather = { condition: 'Regen', text: '🌧️ Starkregen, 11°C, Wind: 34 km/h' };
+            else if (dayNum % 5 === 0) weather = { condition: 'Sonne', text: '☀️ Klarer Himmel, 26°C, Wind: 6 km/h' };
+        }
+
+        const addrForGeocode = cleanAddress.replace(/^\d{1,2}\.\d{1,2}\.\d{4}\s*,\s*\d{1,2}:\d{2}\s*;\s*/, '').trim();
+        const address = addrForGeocode || cleanAddress;
+        const shortAddr = address.split('\n')[0].substring(0, 50);
+
+        // Try to find coordinates via regex
         let coords = null;
         const coordPatterns = [
             /(-?\d{1,2}\.\d+)\s*[,;:\s|]\s*(-?\d{1,3}\.\d+)/,
@@ -1659,46 +1811,15 @@ async function parseAndGeocodeTXT(text, returnOnly) {
             }
         }
 
-        // Parse Datum/Zeit und Adresse
-        const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
-        let timestamp = new Date();
-        let weather = { condition: 'Sonne', text: '☀️ Heiter, 21°C' };
-        let cleanAddress = raw.replace(/\|/g, '').trim();
-
-        for (const line of lines) {
-            // Datum/Zeit erkennen: "25.06.2026, 13:49" oder "25.06.2026,13:49"
-            const dtMatch = line.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s*,\s*(\d{1,2}):(\d{2})/);
-            if (dtMatch) {
-                const [, d, m, y, h, min] = dtMatch;
-                timestamp = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min));
-                // Zufälliges Wetter basierend auf Tag
-                const dayNum = parseInt(d);
-                if (dayNum % 3 === 0) weather = { condition: 'Regen', text: '🌧️ Starkregen, 11°C, Wind: 34 km/h' };
-                else if (dayNum % 5 === 0) weather = { condition: 'Sonne', text: '☀️ Klarer Himmel, 26°C, Wind: 6 km/h' };
-                break;
-            }
-        }
-
-        // Adresse für Geocoding bereinigen (Datum/Zeit + Semikolon entfernen)
-        const addrForGeocode = cleanAddress.replace(/^\d{1,2}\.\d{1,2}\.\d{4}\s*,\s*\d{1,2}:\d{2}\s*;\s*/, '').trim();
-        const address = addrForGeocode || cleanAddress;
-
         if (coords) {
             ok++;
             const country = detectCountry(coords[0], coords[1]);
             if (country) visitedCountries.add(country);
             const dateStr = timestamp.toLocaleDateString('de-DE');
             const timeStr = timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            tempLogs.push({
-                timestamp,
-                dateString: dateStr,
-                timeString: timeStr,
-                address,
-                coords,
-                weather,
-                source: 'txt'
-            });
-        } else {
+            tempLogs.push({ timestamp, dateString: dateStr, timeString: timeStr, address, coords, weather, source: 'txt' });
+            results.push({ status: 'ok', address: shortAddr, coords, reason: `${coords[0].toFixed(4)}, ${coords[1].toFixed(4)} (Regex)` });
+        } else if (addrForGeocode) {
             const coords2 = await fetchCoordinates(addrForGeocode);
             if (coords2) {
                 ok++;
@@ -1706,36 +1827,36 @@ async function parseAndGeocodeTXT(text, returnOnly) {
                 if (country) visitedCountries.add(country);
                 const dateStr = timestamp.toLocaleDateString('de-DE');
                 const timeStr = timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                tempLogs.push({
-                    timestamp,
-                    dateString: dateStr,
-                    timeString: timeStr,
-                    address,
-                    coords: coords2,
-                    weather,
-                    source: 'txt'
-                });
+                tempLogs.push({ timestamp, dateString: dateStr, timeString: timeStr, address, coords: coords2, weather, source: 'txt' });
+                results.push({ status: 'ok', address: shortAddr, coords: coords2, reason: `${coords2[0].toFixed(4)}, ${coords2[1].toFixed(4)} (Geocoding)` });
             } else {
                 fail++;
+                results.push({ status: 'fail', address: shortAddr, reason: 'Adresse nicht gefunden (Photon + Nominatim)' });
                 const short = address.split('\n')[0].substring(0, 40);
-                failedAddr.push(short);
-                errLog.textContent = '❌ ' + failedAddr.slice(-5).join('\n❌ ');
+                errLog.textContent = '❌ ' + short;
                 errLog.classList.remove('hidden');
             }
+        } else {
+            fail++;
+            results.push({ status: 'fail', address: shortAddr, reason: 'Keine Adresse extrahierbar' });
         }
 
         document.getElementById('imp-ok').textContent = ok;
         document.getElementById('imp-fail').textContent = fail;
     }
 
+    document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
+    document.getElementById('import-detail-btn').classList.remove('hidden');
+    window._lastImportResults = results;
+    window._lastImportOk = ok;
+    window._lastImportFail = fail;
+
     if (returnOnly) {
-        document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
         if (!fail) errLog.classList.add('hidden');
         return tempLogs;
     }
     parsedLogs = [...parsedLogs, ...tempLogs].sort((a, b) => a.timestamp - b.timestamp);
     fillVisitedCountriesFromLogs();
-    document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
     showToast(`${ok} Einträge importiert${fail ? `, ${fail} Fehler` : ''}`);
     if (!fail) errLog.classList.add('hidden');
 }
@@ -1772,8 +1893,8 @@ async function parseAndGeocodeCSV(csvText, returnOnly) {
     document.getElementById('importStats').classList.remove('hidden');
 
     const finalLogs = [];
+    const results = [];
     let ok = 0, fail = 0;
-    const failedAddr = [];
     const errLog = document.getElementById('importErrorLog');
 
     for (let i = 0; i < tempLogs.length; i++) {
@@ -1785,28 +1906,30 @@ async function parseAndGeocodeCSV(csvText, returnOnly) {
         document.getElementById('liveAddressTracker').textContent = log.addressLines[0] || '—';
 
         const addr = log.addressLines.join('\n');
+        const shortAddr = log.addressLines[0] || addr;
         const coords = await fetchCoordinates(addr);
         if (coords) {
             ok++;
             const country = detectCountry(coords[0], coords[1]);
             if (country) visitedCountries.add(country);
             finalLogs.push({ ...log, address: addr, coords, source: 'csv' });
+            results.push({ status: 'ok', address: shortAddr.substring(0, 50), coords, reason: `${coords[0].toFixed(4)}, ${coords[1].toFixed(4)} (Geocoding)` });
         } else {
             fail++;
-            const short = (log.addressLines[0] || addr).substring(0, 40);
-            failedAddr.push(short);
-            errLog.textContent = '❌ ' + failedAddr.slice(-5).join('\n❌ ');
+            results.push({ status: 'fail', address: shortAddr.substring(0, 50), reason: 'Adresse nicht gefunden (Photon + Nominatim)' });
+            const short = shortAddr.substring(0, 40);
+            errLog.textContent = '❌ ' + short;
             errLog.classList.remove('hidden');
         }
         document.getElementById('imp-ok').textContent = ok;
         document.getElementById('imp-fail').textContent = fail;
     }
 
-    if (returnOnly) {
-        document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
-        if (!fail) errLog.classList.add('hidden');
-        return finalLogs;
-    }
+    document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
+    document.getElementById('import-detail-btn').classList.remove('hidden');
+    window._lastImportResults = results;
+    window._lastImportOk = ok;
+    window._lastImportFail = fail;
     parsedLogs = [...parsedLogs, ...finalLogs].sort((a,b) => a.timestamp - b.timestamp);
     fillVisitedCountriesFromLogs();
     document.getElementById('importStatusText').textContent = `✅ ${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}`;
@@ -1815,7 +1938,7 @@ async function parseAndGeocodeCSV(csvText, returnOnly) {
 }
 
 // =====================================================================
-// GEOCODING (Photon — CORS-freundlich, kein API-Key nötig)
+// GEOCODING (Photon + Nominatim Fallback, mit Retry)
 // =====================================================================
 async function fetchCoordinates(address) {
     const lines = address.split('\n').filter(l => l.trim());
@@ -1824,15 +1947,36 @@ async function fetchCoordinates(address) {
         ...(lines.length > 2 ? [lines.slice(-3).join(', ')] : []),
         ...(lines.length > 1 ? [lines.slice(-2).join(', ')] : []),
     ];
+    const uniqueQueries = [...new Set(queries)];
 
-    for (const q of [...new Set(queries)]) {
+    for (const q of uniqueQueries) {
+        // Try Photon with retry
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`);
+                if (r.ok) {
+                    const data = await r.json();
+                    if (data.features?.length > 0) {
+                        const [lon, lat] = data.features[0].geometry.coordinates;
+                        return [lat, lon];
+                    }
+                } else if (r.status === 429) {
+                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                    continue;
+                }
+            } catch(e) {}
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // Fallback: Nominatim
         try {
-            const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`);
+            const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=de`, {
+                headers: { 'User-Agent': 'ExploreYourWay/1.0' }
+            });
             if (r.ok) {
                 const data = await r.json();
-                if (data.features?.length > 0) {
-                    const [lon, lat] = data.features[0].geometry.coordinates;
-                    return [lat, lon];
+                if (data.length > 0) {
+                    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
                 }
             }
         } catch(e) {}
@@ -2721,6 +2865,9 @@ function updateExploreTab() {
         </div>`;
     }).join('');
 
+    renderHeatmap();
+    renderCharts();
+
     requestAnimationFrame(() => { map.invalidateSize(true); });
 }
 
@@ -2986,8 +3133,263 @@ function renderMobileSheetContent(tabName) {
 }
 
 // =====================================================================
-// START
+// HEATMAP KALENDER (GitHub-Style)
 // =====================================================================
+function renderHeatmap() {
+    const container = document.getElementById('heatmap-grid');
+    if (!container) return;
+    const now = new Date();
+    const dayCounts = {};
+    parsedLogs.forEach(l => {
+        if (!l.timestamp) return;
+        const key = l.timestamp.toDateString();
+        dayCounts[key] = (dayCounts[key] || 0) + 1;
+    });
+    const maxVal = Math.max(...Object.values(dayCounts), 1);
+    const days = 84;
+    const dayMs = 86400000;
+    let html = '';
+    for (let c = 0; c < 12; c++) {
+        html += '<div style="display:flex;flex-direction:column;gap:2px;">';
+        for (let r = 0; r < 7; r++) {
+            const idx = days - 1 - (c * 7 + r);
+            const d = new Date(now.getTime() - idx * dayMs);
+            const key = d.toDateString();
+            const count = dayCounts[key] || 0;
+            const intensity = count / maxVal;
+            let bg;
+            if (count === 0) bg = 'rgba(var(--accent-rgb),0.04)';
+            else if (intensity < 0.25) bg = 'rgba(var(--accent-rgb),0.12)';
+            else if (intensity < 0.5) bg = 'rgba(var(--accent-rgb),0.3)';
+            else if (intensity < 0.75) bg = 'rgba(var(--accent-rgb),0.55)';
+            else bg = 'var(--accent)';
+            const title = `${d.toLocaleDateString('de-DE')}: ${count} Eintr\u00e4ge`;
+            html += `<div style="width:10px;height:10px;border-radius:2px;background:${bg}" title="${title}"></div>`;
+        }
+        html += '</div>';
+    }
+    container.innerHTML = html;
+}
+
+// =====================================================================
+// STATISTIK-CHARTS (Canvas)
+// =====================================================================
+function renderCharts() {
+    renderActivityChart();
+    renderWeatherChart();
+    renderTimeOfDayChart();
+}
+
+function renderActivityChart() {
+    const canvas = document.getElementById('chart-activity');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = 80 * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = '80px';
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = 80;
+
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.toDateString());
+    }
+    const counts = days.map(d => parsedLogs.filter(l => l.timestamp && l.timestamp.toDateString() === d).length);
+    const max = Math.max(...counts, 1);
+    const barW = (w - 20) / 14;
+    ctx.clearRect(0, 0, w, h);
+
+    counts.forEach((c, i) => {
+        const barH = (c / max) * (h - 24);
+        const x = 10 + i * barW + 2;
+        const y = h - 14 - barH;
+        const rgb = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim();
+        ctx.fillStyle = `rgba(${rgb},${0.3 + 0.7 * (c / max)})`;
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW - 4, barH, 2);
+        ctx.fill();
+    });
+    // labels
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#64748b';
+    ctx.font = '7px sans-serif';
+    counts.forEach((c, i) => {
+        const x = 10 + i * barW + 2;
+        ctx.fillText(c, x + 1, h - 3);
+    });
+}
+
+function renderWeatherChart() {
+    const canvas = document.getElementById('chart-weather');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = 70 * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = '70px';
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = 70;
+
+    const labels = ['Sonne', 'Regen', 'Unbekannt'];
+    const counts = labels.map(lbl =>
+        parsedLogs.filter(l => (l.weather?.condition || 'Unbekannt') === lbl).length
+    );
+    const total = counts.reduce((a, b) => a + b, 0) || 1;
+    const rgb = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim();
+    const colors = [
+        `rgba(${rgb},0.7)`,
+        `rgba(${rgb},0.4)`,
+        `rgba(${rgb},0.15)`,
+    ];
+
+    ctx.clearRect(0, 0, w, h);
+    let x = 10;
+    counts.forEach((c, i) => {
+        const bw = (c / total) * (w - 20);
+        ctx.fillStyle = colors[i];
+        ctx.beginPath();
+        ctx.roundRect(x, 10, Math.max(bw - 2, 0), 12, 4);
+        ctx.fill();
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#64748b';
+        ctx.font = '7px sans-serif';
+        ctx.fillText(`${labels[i]} ${Math.round(c / total * 100)}%`, x, 36);
+        x += bw;
+    });
+}
+
+function renderTimeOfDayChart() {
+    const canvas = document.getElementById('chart-timeofday');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = 70 * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = '70px';
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = 70;
+
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const counts = hours.map(h =>
+        parsedLogs.filter(l => l.timestamp && l.timestamp.getHours() === h).length
+    );
+    const max = Math.max(...counts, 1);
+    const barW = (w - 20) / 24;
+    const rgb = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim();
+
+    ctx.clearRect(0, 0, w, h);
+    counts.forEach((c, i) => {
+        const barH = (c / max) * (h - 20);
+        const x = 10 + i * barW + 1;
+        ctx.fillStyle = `rgba(${rgb},${0.2 + 0.8 * (c / max)})`;
+        ctx.beginPath();
+        ctx.roundRect(x, h - 14 - barH, barW - 2, barH, 2);
+        ctx.fill();
+    });
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#64748b';
+    ctx.font = '6px sans-serif';
+    for (let i = 0; i < 24; i += 4) {
+        ctx.fillText(i + 'h', 10 + i * barW, h - 2);
+    }
+}
+
+// =====================================================================
+// LIVE GPS-TRACKING
+// =====================================================================
+let gpsWatchId = null;
+let gpsPoints = [];
+let gpsMarker = null;
+
+function startGpsTracking() {
+    if (!navigator.geolocation) {
+        showToast('❌ Geolocation wird von diesem Browser nicht unterstützt');
+        return;
+    }
+    gpsPoints = [];
+    document.getElementById('gps-status').classList.remove('hidden');
+    document.getElementById('gps-status').textContent = '🔍 Suche GPS-Signal...';
+    document.getElementById('gps-start-btn').disabled = true;
+    document.getElementById('gps-start-btn').style.opacity = '0.4';
+    document.getElementById('gps-stop-btn').disabled = false;
+    document.getElementById('gps-stop-btn').style.opacity = '1';
+    document.getElementById('gps-stop-btn').style.background = 'rgba(239,68,68,0.1)';
+    document.getElementById('gps-stop-btn').style.borderColor = 'rgba(239,68,68,0.3)';
+    document.getElementById('gps-stop-btn').style.color = '#ef4444';
+
+    gpsWatchId = navigator.geolocation.watchPosition(pos => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        document.getElementById('gps-status').textContent = '🟢 Tracking aktiv';
+        document.getElementById('gps-coords').textContent = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        document.getElementById('gps-accuracy').textContent = `±${Math.round(accuracy)}m`;
+
+        gpsPoints.push({ lat: latitude, lon: longitude, timestamp: new Date(), accuracy });
+
+        if (!gpsMarker) {
+            gpsMarker = L.circleMarker([latitude, longitude], {
+                radius: 8, color: 'var(--accent)', fillColor: 'var(--accent)',
+                fillOpacity: 0.6, weight: 2
+            }).addTo(map);
+        } else {
+            gpsMarker.setLatLng([latitude, longitude]);
+        }
+
+        document.getElementById('gps-count').textContent = gpsPoints.length;
+        document.getElementById('gps-save-btn').classList.remove('hidden');
+    }, err => {
+        document.getElementById('gps-status').textContent = `❌ Fehler: ${err.message}`;
+    }, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000,
+    });
+}
+
+function stopGpsTracking() {
+    if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        gpsWatchId = null;
+    }
+    document.getElementById('gps-status').textContent = '⏹ Tracking gestoppt';
+    document.getElementById('gps-start-btn').disabled = false;
+    document.getElementById('gps-start-btn').style.opacity = '1';
+    document.getElementById('gps-stop-btn').disabled = true;
+    document.getElementById('gps-stop-btn').style.opacity = '0.4';
+    document.getElementById('gps-stop-btn').style.background = '';
+    document.getElementById('gps-stop-btn').style.borderColor = '';
+    document.getElementById('gps-stop-btn').style.color = '';
+}
+
+function saveGpsPoints() {
+    if (gpsPoints.length === 0) {
+        showToast('Keine GPS-Punkte zum Speichern');
+        return;
+    }
+    const newLogs = gpsPoints.map(p => ({
+        timestamp: p.timestamp,
+        dateString: p.timestamp.toLocaleDateString('de-DE'),
+        timeString: p.timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        address: `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)} (GPS-Tracking)`,
+        coords: [p.lat, p.lon],
+        weather: { condition: 'Sonne', text: '☀️ GPS-Aufnahme' },
+        source: 'gps'
+    }));
+    parsedLogs = [...parsedLogs, ...newLogs].sort((a, b) => a.timestamp - b.timestamp);
+    fillVisitedCountriesFromLogs();
+    saveState();
+    updateDisplay();
+    updateExploreTab();
+    showToast(`${newLogs.length} GPS-Punkte gespeichert`);
+    gpsPoints = [];
+    document.getElementById('gps-count').textContent = '0';
+    document.getElementById('gps-save-btn').classList.add('hidden');
+}
 // Load saved accent
 (function loadSavedAccent() {
     try {
