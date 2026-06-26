@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ExploreYourWay - Fog of War</title>
+    <title>Explore_Your_Way</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -123,48 +123,54 @@
             overflow: hidden;
         }
 
-        /* MOBILE: Sidebar als Bottom-Sheet, Karte immer fullscreen */
+        /* MOBILE: Vollbild-Umschalter (Karte ↔ Menü) */
         @media (max-width: 767px) {
-            #sidebar {
-                display: none;
-            }
-
-            #mobile-sheet-overlay {
-                display: none;
-                position: fixed;
-                inset: 0;
-                z-index: 2000;
-                background: rgba(0,0,0,0.2);
-            }
-            #mobile-sheet-overlay.open { display: block; }
+            #sidebar { display: none; }
 
             #mobile-sheet {
                 position: fixed;
                 inset: 0;
-                z-index: 2100;
+                z-index: 2000;
                 background: var(--bg-sidebar);
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
-                transform: translateY(100%);
-                transition: transform 0.32s cubic-bezier(0.22,1,0.36,1);
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
                 padding-bottom: env(safe-area-inset-bottom, 0px);
             }
             #mobile-sheet.open {
-                transform: translateY(0);
+                transform: translateX(0);
             }
-            #mobile-sheet-handle { display: none; }
             #mobile-sheet-tabs {
                 display: flex;
-                gap: 6px;
+                gap: 4px;
                 padding: 56px 12px 8px;
                 border-bottom: 1px solid var(--border-color);
                 flex-shrink: 0;
+            }
+            #mobile-sheet-tabs .tab-btn {
+                flex: 1;
+                text-align: center;
+                padding: 7px 4px;
+                font-size: 10px;
+                font-weight: 600;
+                border-radius: 10px;
+                border: none;
+                background: transparent;
+                color: var(--text-muted);
+                cursor: pointer;
+                transition: all 0.15s;
+            }
+            #mobile-sheet-tabs .tab-btn.active {
+                background: var(--accent);
+                color: var(--accent-fg);
             }
             #mobile-sheet-content {
                 flex: 1;
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
+                padding: 12px;
             }
 
             #mobile-toggle-fab {
@@ -188,19 +194,19 @@
             }
             #mobile-toggle-fab:active { transform: scale(0.92); }
 
-            /* Map controls on mobile: bottom left, above FAB */
+            /* Map controls on mobile */
             #map-controls { bottom: 84px; }
             #map-style-picker { bottom: 128px; left: 12px; }
         }
         @media (min-width: 768px) {
-            #mobile-sheet-overlay, #mobile-sheet, #mobile-toggle-fab { display: none !important; }
+            #mobile-toggle-fab, #mobile-sheet { display: none !important; }
         }
 
         /* Narrow mobile: vertical layout left edge */
         @media (max-width: 400px) {
             #map-controls {
                 left: 6px;
-                bottom: 84px;
+                bottom: 64px;
             }
             #quick-settings {
                 flex-direction: column;
@@ -704,7 +710,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-base font-bold tracking-tight">ExploreYourWay</h1>
-                    <p class="text-[10px]" style="color:var(--text-muted)">Fog of War · Analytics</p>
+                    <p class="text-[10px]" style="color:var(--text-muted)"></p>
                 </div>
                 <button onclick="toggleTheme()" class="p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-colors hover:opacity-80" style="border-color:var(--border-color);background:var(--bg-card)">
                     <span id="theme-icon">🌙</span>
@@ -941,6 +947,7 @@
                 <button onclick="exportFullBackup()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">💾 Komplett-Backup (alle Daten + Einstellungen)</button>
                 <input type="file" id="backupFileInput" accept=".json" hidden onchange="importFullBackup(event)">
                 <button onclick="document.getElementById('backupFileInput').click()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">📂 Backup importieren</button>
+                <button onclick="exportMapImage()" class="w-full text-xs font-semibold py-2 rounded-lg border hover:opacity-80" style="background:var(--bg-card);border-color:var(--border-color)">🖼 Karte als PNG exportieren</button>
             </div>
 
             <!-- Danger Zone -->
@@ -981,10 +988,6 @@
                     <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color);opacity:0.5">
                         <span class="text-sm mt-0.5">📍</span>
                         <div><div class="text-xs font-semibold">Notizen & Fotos je Ort</div><div class="text-[10px]" style="color:var(--text-muted)">Erinnerungen und Bilder direkt einem besuchten Standort anheften</div></div>
-                    </div>
-                    <div class="flex items-start gap-2 p-2.5 rounded-lg" style="background:var(--bg-card);border:1px solid var(--border-color);opacity:0.5">
-                        <span class="text-sm mt-0.5">🔗</span>
-                        <div><div class="text-xs font-semibold">Teilen & Export als Bild</div><div class="text-[10px]" style="color:var(--text-muted)">Karte als PNG exportieren, Fog-of-War Screenshot-Sharing</div></div>
                     </div>
                 </div>
             </div>
@@ -1067,19 +1070,13 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- Mobile: Single Toggle-FAB -->
-<button id="mobile-toggle-fab" onclick="toggleMobileSheet()" aria-label="Menü öffnen">☰</button>
-
-<!-- Mobile: Bottom-Sheet Overlay (Tap-outside schließt) -->
-<div id="mobile-sheet-overlay" onclick="closeMobileSheet()"></div>
-
-<!-- Mobile: Bottom Sheet -->
+<!-- Mobile: Vollbild-Umschalter -->
+<button id="mobile-toggle-fab" onclick="toggleMobileSheet()" aria-label="Menü">☰</button>
 <div id="mobile-sheet">
-    <div id="mobile-sheet-handle"></div>
     <div id="mobile-sheet-tabs">
-        <button onclick="switchMobileTab('karte')" id="mobile-tab-karte" class="tab-btn active flex-1 text-xs font-semibold py-2 rounded-lg">🗺 Karte</button>
-        <button onclick="switchMobileTab('entdeckt')" id="mobile-tab-entdeckt" class="tab-btn flex-1 text-xs font-semibold py-2 rounded-lg">🏆 Entdeckt</button>
-        <button onclick="switchMobileTab('einstellungen')" id="mobile-tab-einstellungen" class="tab-btn flex-1 text-xs font-semibold py-2 rounded-lg">⚙ Einst.</button>
+        <button onclick="switchMobileTab('karte')" id="mobile-tab-karte" class="tab-btn active">🗺 Karte</button>
+        <button onclick="switchMobileTab('entdeckt')" id="mobile-tab-entdeckt" class="tab-btn">🏆 Entdeckt</button>
+        <button onclick="switchMobileTab('einstellungen')" id="mobile-tab-einstellungen" class="tab-btn">⚙ Einst.</button>
     </div>
     <div id="mobile-sheet-content"></div>
 </div>
@@ -1293,7 +1290,7 @@ const ACHIEVEMENTS = [
     }},
     { id: 'country2', icon: '🌎', title: 'Grenzgänger', desc: '2 Länder besucht', check: s => s.visitedCountries.size >= 2 },
     { id: 'country5', icon: '🌏', title: 'Weltreisender', desc: '5 Länder besucht', check: s => s.visitedCountries.size >= 5 },
-    { id: 'km5', icon: '🥉', title: '5 km² erforscht', desc: 'Fog of War lichtet sich', check: s => calcExploreArea(s.logs) >= 5 },
+    { id: 'km5', icon: '🥉', title: '5 km² erforscht', desc: 'Etwas von der Welt gesehen', check: s => calcExploreArea(s.logs) >= 5 },
     { id: 'km50', icon: '🥈', title: '50 km² erforscht', desc: 'Großer Entdecker', check: s => calcExploreArea(s.logs) >= 50 },
     { id: 'km200', icon: '🥇', title: '200 km² erforscht', desc: 'Legendärer Kundschafter', check: s => calcExploreArea(s.logs) >= 200 },
 ];
@@ -2264,12 +2261,10 @@ function updateDisplay() {
     if (!filtered.length) {
         drawExploredArea();
         updateGlowPoints();
-    // 6. LÄNDER-MODUS
-    if (document.getElementById('countryModeToggle').checked) {
-        drawCountryOverlay();
-    }
-
-    updateInspector();
+        if (document.getElementById('countryModeToggle').checked) drawCountryOverlay();
+        updateInspector();
+        updateDataStatus();
+        requestAnimationFrame(() => { map.invalidateSize(true); });
         return;
     }
 
@@ -2818,6 +2813,52 @@ function exportData(format) {
     showToast(`✅ ${filename} exportiert`);
 }
 
+function exportMapImage() {
+    showToast('📸 Erstelle Kartenbild...');
+    const container = document.getElementById('map-container');
+    const fogEl = document.getElementById('fog-layer');
+    const fogWasVisible = fogEl.classList.contains('visible');
+    // Temporarily hide fog for clean screenshot
+    fogEl.classList.remove('visible');
+
+    // Check if html2canvas is already loaded
+    if (typeof html2canvas === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        script.onload = () => doCapture(container, fogEl, fogWasVisible);
+        script.onerror = () => {
+            fogEl.classList.toggle('visible', fogWasVisible);
+            showToast('❌ Konnte html2canvas nicht laden');
+        };
+        document.head.appendChild(script);
+    } else {
+        doCapture(container, fogEl, fogWasVisible);
+    }
+}
+
+function doCapture(container, fogEl, fogWasVisible) {
+    html2canvas(container, {
+        useCORS: true,
+        backgroundColor: null,
+        scale: 2,
+        logging: false,
+    }).then(canvas => {
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `exploreyourway_karte_${new Date().toISOString().slice(0,10)}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            fogEl.classList.toggle('visible', fogWasVisible);
+            showToast('✅ Kartenbild exportiert');
+        });
+    }).catch(err => {
+        fogEl.classList.toggle('visible', fogWasVisible);
+        showToast('❌ Fehler: ' + err.message);
+    });
+}
+
 // =====================================================================
 // VISIT POPUP (Legacy — wird für Region-Clicks noch genutzt)
 // =====================================================================
@@ -3078,7 +3119,7 @@ function setAccent(name, hex) {
 }
 
 // =====================================================================
-// MOBILE BOTTOM SHEET
+// MOBILE BOTTOM DRAWER
 // =====================================================================
 let mobileSheetOpen = false;
 let currentMobileTab = 'karte';
@@ -3094,27 +3135,28 @@ function toggleMobileSheet() {
 function openMobileSheet() {
     mobileSheetOpen = true;
     document.getElementById('mobile-sheet').classList.add('open');
-    document.getElementById('mobile-sheet-overlay').classList.add('open');
     document.getElementById('mobile-toggle-fab').textContent = '✕';
     renderMobileSheetContent(currentMobileTab);
-    requestAnimationFrame(() => { map.invalidateSize(true); });
 }
 
 function closeMobileSheet() {
     mobileSheetOpen = false;
     document.getElementById('mobile-sheet').classList.remove('open');
-    document.getElementById('mobile-sheet-overlay').classList.remove('open');
     document.getElementById('mobile-toggle-fab').textContent = '☰';
-    requestAnimationFrame(() => { map.invalidateSize(true); });
 }
 
 function switchMobileTab(name) {
+    if (name === currentMobileTab && mobileSheetOpen) {
+        closeMobileSheet();
+        return;
+    }
     currentMobileTab = name;
     ['karte','entdeckt','einstellungen'].forEach(t => {
         const btn = document.getElementById('mobile-tab-' + t);
         if (btn) btn.classList.toggle('active', t === name);
     });
     renderMobileSheetContent(name);
+    if (!mobileSheetOpen) openMobileSheet();
 }
 
 function renderMobileSheetContent(tabName) {
@@ -3123,14 +3165,56 @@ function renderMobileSheetContent(tabName) {
     const panel = document.getElementById('panel-' + tabName);
     const target = document.getElementById('mobile-sheet-content');
     if (!panel || !target) return;
+
     target.innerHTML = panel.innerHTML;
-    // Re-bind checkboxes: sync state from real DOM
+
+    // Rename conflicting IDs in panel AFTER clone so mobile sheet elements keep original IDs
+    const conflictIds = ['heatmap-grid', 'chart-activity', 'chart-weather', 'chart-timeofday'];
+    conflictIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && panel.contains(el)) el.id = id + '-tmp';
+    });
+
     ['yourWayToggle','exploreModeToggle','fogToggle','countryModeToggle'].forEach(id => {
         const orig = document.getElementById(id);
         const copy = target.querySelector('#' + id);
         if (orig && copy) copy.checked = orig.checked;
     });
+    // Re-render canvas charts and heatmap in mobile DOM
+    if (tabName === 'entdeckt') {
+        setTimeout(() => {
+            renderCharts();
+            renderHeatmap();
+            // Restore original panel IDs
+            conflictIds.forEach(id => {
+                const el = document.getElementById(id + '-tmp');
+                if (el) el.id = id;
+            });
+        }, 50);
+    }
 }
+
+// Re-render charts on resize/orientation change when mobile sheet is open
+let _resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+        const sheet = document.getElementById('mobile-sheet');
+        if (!sheet.classList.contains('open')) return;
+        const conflictIds = ['heatmap-grid', 'chart-activity', 'chart-weather', 'chart-timeofday'];
+        const panel = document.getElementById('panel-entdeckt');
+        conflictIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && panel && panel.contains(el)) el.id = id + '-tmp';
+        });
+        renderCharts();
+        renderHeatmap();
+        conflictIds.forEach(id => {
+            const el = document.getElementById(id + '-tmp');
+            if (el) el.id = id;
+        });
+    }, 200);
+});
 
 // =====================================================================
 // HEATMAP KALENDER (GitHub-Style)
